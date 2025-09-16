@@ -1,0 +1,38 @@
+# golangci-lint configuration for sttrouter
+# This configuration enforces practical Go coding standards while avoiding unhelpful complexity metrics
+# Focus is on catching actual bugs and maintainability issues rather than arbitrary style preferences
+
+version: "2"
+
+run:
+  timeout: 5m  # Allow up to 5 minutes for linting to complete
+
+linters:
+  enable:
+    - staticcheck    # Advanced static analysis
+    - govet          # Go vet checks
+    - unused         # Check for unused variables/constants
+    - ineffassign    # Check for ineffectual assignments
+    - errcheck       # Check for unchecked errors
+    - misspell       # Check for misspelled words
+
+  # Explicitly disable complexity metrics that don't provide meaningful quality insights
+  disable:
+    - gocyclo        # Cyclomatic complexity - penalizes valid patterns
+    - gocognit       # Cognitive complexity - subjective metric
+    - cyclop         # Similar to gocyclo
+    - maintidx       # Maintainability index - not actionable
+    - nestif         # Nested if statements - can be valid
+    - funlen         # Function length - arbitrary limits
+    - lll            # Line length - handled by gofmt
+    - gochecknoglobals # Global variables - can be valid in CLIs
+    - gochecknoinits  # init functions - can be appropriate
+    - exhaustive     # Exhaustive checks - can be overly strict
+    - godot          # Comments ending with periods - style preference
+
+  exclusions:
+    rules:
+      # Exclude errcheck from running on tests files
+      - path: _test\.go
+        linters:
+          - errcheck

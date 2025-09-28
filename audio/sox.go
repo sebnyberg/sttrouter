@@ -40,7 +40,13 @@ func CaptureAudio(ctx context.Context, log *slog.Logger, args CaptureArgs) (retE
 		cmdArgs = append(cmdArgs, "-r", fmt.Sprintf("%d", args.Device.SampleRate))
 	}
 
-	cmdArgs = append(cmdArgs, "-t", "raw", "-e", "signed-integer", "-b", strconv.Itoa(args.BitDepth), "-c", strconv.Itoa(args.Channels))
+	cmdArgs = append(
+		cmdArgs,
+		"-t", "raw",
+		"-e", "signed-integer",
+		"-b", strconv.Itoa(args.BitDepth),
+		"-c", strconv.Itoa(args.Channels),
+	)
 
 	// Use "-" to output to stdout when writing to io.Writer
 	cmdArgs = append(cmdArgs, "-")
@@ -92,29 +98,52 @@ func CaptureAudio(ctx context.Context, log *slog.Logger, args CaptureArgs) (retE
 	return nil
 }
 
+// ConvertAudioArgs holds the arguments for audio conversion
+type ConvertAudioArgs struct {
+	Reader       io.Reader
+	Writer       io.Writer
+	SourceFormat string
+	TargetFormat string
+	SampleRate   int
+	Channels     int
+	BitDepth     int
+}
+
 // ConvertAudio converts audio from sourceFormat to targetFormat using sox
-func ConvertAudio(ctx context.Context, log *slog.Logger, reader io.Reader, writer io.Writer, sourceFormat, targetFormat string, sampleRate, channels, bitDepth int) error {
+func ConvertAudio(ctx context.Context, log *slog.Logger, args ConvertAudioArgs) error {
 	// Source format
-	args := []string{"-t", sourceFormat}
-	if sourceFormat == "raw" {
-		args = append(args, "-r", strconv.Itoa(sampleRate), "-c", strconv.Itoa(channels), "-b", strconv.Itoa(bitDepth), "-e", "signed-integer")
+	cmdArgs := []string{"-t", args.SourceFormat}
+	if args.SourceFormat == "raw" {
+		cmdArgs = append(
+			cmdArgs,
+			"-r", strconv.Itoa(args.SampleRate),
+			"-c", strconv.Itoa(args.Channels),
+			"-b", strconv.Itoa(args.BitDepth),
+			"-e", "signed-integer",
+		)
 	}
-	args = append(args, "-")
+	cmdArgs = append(cmdArgs, "-")
 
 	// Target format
-	args = append(args, "-t", targetFormat)
-	if targetFormat == "raw" {
-		args = append(args, "-r", strconv.Itoa(sampleRate), "-c", strconv.Itoa(channels), "-b", strconv.Itoa(bitDepth), "-e", "signed-integer")
+	cmdArgs = append(cmdArgs, "-t", args.TargetFormat)
+	if args.TargetFormat == "raw" {
+		cmdArgs = append(
+			cmdArgs,
+			"-r", strconv.Itoa(args.SampleRate),
+			"-c", strconv.Itoa(args.Channels),
+			"-b", strconv.Itoa(args.BitDepth),
+			"-e", "signed-integer",
+		)
 	}
-	args = append(args, "-")
+	cmdArgs = append(cmdArgs, "-")
 
 	log.InfoContext(ctx, "Running sox convert",
-		"args", args,
-		"command", fmt.Sprintf("sox %s", strings.Join(args, " ")))
+		"args", cmdArgs,
+		"command", fmt.Sprintf("sox %s", strings.Join(cmdArgs, " ")))
 
-	cmd := exec.CommandContext(ctx, "sox", args...)
-	cmd.Stdin = reader
-	cmd.Stdout = writer
+	cmd := exec.CommandContext(ctx, "sox", cmdArgs...)
+	cmd.Stdin = args.Reader
+	cmd.Stdout = args.Writer
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

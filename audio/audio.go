@@ -101,7 +101,12 @@ type LimitedCaptureArgs struct {
 }
 
 // LimitedCapture captures raw audio from the device until silence is detected or duration expires
-func LimitedCapture(ctx context.Context, logger *slog.Logger, device Device, args LimitedCaptureArgs) (io.Reader, error) {
+func LimitedCapture(
+	ctx context.Context,
+	logger *slog.Logger,
+	device Device,
+	args LimitedCaptureArgs,
+) (io.Reader, error) {
 	// Buffer to collect raw audio
 	buffer := &bytes.Buffer{}
 
@@ -114,10 +119,18 @@ func LimitedCapture(ctx context.Context, logger *slog.Logger, device Device, arg
 	if args.EnableSilence {
 		// Set up silence splitter
 		silenceReader, silenceWriter := io.Pipe()
-		splitter := NewSilenceSplitter(ctx, args.Channels, args.BitDepth, args.SilenceThreshold, args.SilenceMinDuration, device.SampleRate, func(data []byte) {
-			_, _ = silenceWriter.Write(data)
-			captureCancel()
-		})
+		splitter := NewSilenceSplitter(
+			ctx,
+			args.Channels,
+			args.BitDepth,
+			args.SilenceThreshold,
+			args.SilenceMinDuration,
+			device.SampleRate,
+			func(data []byte) {
+				_, _ = silenceWriter.Write(data)
+				captureCancel()
+			},
+		)
 
 		g.Go(func() error {
 			defer func() { _ = silenceWriter.Close() }()

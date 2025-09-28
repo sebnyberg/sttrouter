@@ -20,7 +20,14 @@ type SilenceSplitter struct {
 }
 
 // NewSilenceSplitter creates a new SilenceSplitter
-func NewSilenceSplitter(ctx context.Context, channels, bitDepth int, threshold float64, minDuration time.Duration, sampleRate int, callback func([]byte)) *SilenceSplitter {
+func NewSilenceSplitter(
+	ctx context.Context,
+	channels, bitDepth int,
+	threshold float64,
+	minDuration time.Duration,
+	sampleRate int,
+	callback func([]byte),
+) *SilenceSplitter {
 	maxAmp := 1 << uint(bitDepth-1)
 	thresh := int(threshold * float64(maxAmp))
 	minSamples := int(minDuration.Seconds() * float64(sampleRate) * float64(channels))

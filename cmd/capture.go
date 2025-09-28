@@ -117,7 +117,15 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		return fmt.Errorf("audio capture failed: %w", err)
 	}
 
-	err = audio.ConvertAudio(ctx, logger, reader, writer, "raw", "flac", selectedDevice.SampleRate, config.Channels, config.BitDepth)
+	err = audio.ConvertAudio(ctx, logger, audio.ConvertAudioArgs{
+		Reader:       reader,
+		Writer:       writer,
+		SourceFormat: "raw",
+		TargetFormat: "flac",
+		SampleRate:   selectedDevice.SampleRate,
+		Channels:     config.Channels,
+		BitDepth:     config.BitDepth,
+	})
 	if err != nil {
 		return fmt.Errorf("audio conversion failed: %w", err)
 	}

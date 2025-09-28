@@ -10,10 +10,11 @@ import (
 
 func main() {
 	app := &cli.App{
-		Name:        "sttrouter",
-		Usage:       "speech-to-text transcription CLI for developers",
-		Description: "Capture audio from microphone and transcribe speech to text using Whisper API.\nSupports output to clipboard, stdout, or files for integration into development workflows.",
-		Version:     "dev",
+		Name:  "sttrouter",
+		Usage: "speech-to-text transcription CLI for developers",
+		Description: "Capture audio from microphone and transcribe speech to text using Whisper API.\n" +
+			"Supports output to clipboard, stdout, or files for integration into development workflows.",
+		Version: "dev",
 		Authors: []*cli.Author{
 			{
 				Name: "Sebastian Nyberg",

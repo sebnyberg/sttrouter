@@ -7,6 +7,10 @@ version: "2"
 run:
   timeout: 5m  # Allow up to 5 minutes for linting to complete
 
+linters-settings:
+  lll:
+    line-length: 120
+
 linters:
   enable:
     - staticcheck    # Advanced static analysis
@@ -15,6 +19,7 @@ linters:
     - ineffassign    # Check for ineffectual assignments
     - errcheck       # Check for unchecked errors
     - misspell       # Check for misspelled words
+    - lll            # Line length
 
   # Explicitly disable complexity metrics that don't provide meaningful quality insights
   disable:
@@ -24,7 +29,6 @@ linters:
     - maintidx       # Maintainability index - not actionable
     - nestif         # Nested if statements - can be valid
     - funlen         # Function length - arbitrary limits
-    - lll            # Line length - handled by gofmt
     - gochecknoglobals # Global variables - can be valid in CLIs
     - gochecknoinits  # init functions - can be appropriate
     - exhaustive     # Exhaustive checks - can be overly strict
@@ -36,3 +40,4 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
+          - lll

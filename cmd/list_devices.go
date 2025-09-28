@@ -40,7 +40,15 @@ func (r *listDevicesResult) ToTable() string {
 		isSink := dev.Mode&audio.DeviceFlagSink != 0
 		isCurrentSource := dev.Mode&audio.DeviceFlagCurrentSource != 0
 		isCurrentSink := dev.Mode&audio.DeviceFlagCurrentSink != 0
-		if _, err := fmt.Fprintf(w, "%s\t%t\t%t\t%t\t%t\n", dev.Name, isSource, isSink, isCurrentSource, isCurrentSink); err != nil {
+		if _, err := fmt.Fprintf(
+			w,
+			"%s\t%t\t%t\t%t\t%t\n",
+			dev.Name,
+			isSource,
+			isSink,
+			isCurrentSource,
+			isCurrentSink,
+		); err != nil {
 			return ""
 		}
 	}
@@ -70,7 +78,13 @@ func (c *ListDevicesConfig) validate() error {
 	case textOutputFormatJSON, textOutputFormatTable, textOutputFormatCSV:
 		return nil
 	default:
-		return fmt.Errorf("invalid output format: %s (valid values: %s, %s, %s)", c.OutputFormat, textOutputFormatJSON, textOutputFormatTable, textOutputFormatCSV)
+		return fmt.Errorf(
+			"invalid output format: %s (valid values: %s, %s, %s)",
+			c.OutputFormat,
+			textOutputFormatJSON,
+			textOutputFormatTable,
+			textOutputFormatCSV,
+		)
 	}
 }
 

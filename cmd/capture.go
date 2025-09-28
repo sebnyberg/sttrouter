@@ -7,12 +7,12 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/sebnyberg/flagtags"
 	"github.com/sebnyberg/sttrouter/audio"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 // CaptureConfig holds capture specific configuration flags.
@@ -27,7 +27,8 @@ type CaptureConfig struct {
 
 // runCapture executes the audio capture logic.
 func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, duration time.Duration) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
@@ -67,34 +68,51 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		selectedDevice.SampleRate = rate
 	}
 
-	// Parse format
-	format := "flac"
-
-	// Determine output writer
-	var output io.Writer
-	var file *os.File
-	if outputFile == "-" {
-		output = os.Stdout
-	} else {
-		file, err = os.Create(outputFile)
-		if err != nil {
-			return fmt.Errorf("failed to create output file: %w", err)
-		}
-		defer func() { _ = file.Close() }()
-		output = file
-	}
-
 	// Print individual fields to avoid JSON serialization issues
 	slog.Info("Starting audio capture",
 		"device_name", selectedDevice.Name,
 		"duration", duration,
-		"format", format,
 		"output", outputFile)
 
-	err = selectedDevice.CaptureAudio(sox, ctx, logger, duration, format, output)
+	captureCtx, captureCancel := context.WithCancel(ctx)
+	defer captureCancel()
+	if duration != 0 {
+		t := time.AfterFunc(duration, func() {
+			captureCancel()
+		})
+		defer func() {
+			t.Stop()
+		}()
+	}
+
+	// Set up capture I/O
+	g := new(errgroup.Group)
+	captureReader, captureWriter := io.Pipe()
+
+	// Asynchronously read from the capture inputs into the Converter, which in
+	// turn writes to the FLAC output
+	outf, err := os.Create(outputFile)
+	if err != nil {
+		return fmt.Errorf("failed to create file, %w", err)
+	}
+	g.Go(func() error {
+		err := sox.ConvertAudio(ctx, logger, captureReader, outf, "raw", "flac", selectedDevice.SampleRate, 2, 16)
+		if err != nil {
+			return err
+		}
+		return outf.Close()
+	})
+
+	// Capture audio until duration is finished.
+	err = selectedDevice.CaptureAudio(sox, captureCtx, logger, captureWriter)
+	captureWriter.Close()
 	if err != nil {
 		slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
 		return fmt.Errorf("audio capture failed: %w", err)
+	}
+
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	if baseConfig.Verbose {
@@ -137,13 +155,6 @@ Examples:
 			}
 
 			outputFile := c.Args().Get(0)
-
-			// Validate output file extension
-			if outputFile != "-" {
-				if !strings.HasSuffix(strings.ToLower(outputFile), ".flac") {
-					return fmt.Errorf("output file must have .flac extension")
-				}
-			}
 
 			if err := baseConfig.validate(); err != nil {
 				return err

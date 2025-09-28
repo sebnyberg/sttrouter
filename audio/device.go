@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
-	"time"
 )
 
 // DeviceFlag represents device capabilities and defaults as bit flags
@@ -39,6 +38,6 @@ func (d Device) MarshalJSON() ([]byte, error) {
 }
 
 // CaptureAudio captures audio from this device using the provided Sox instance
-func (d Device) CaptureAudio(sox *Sox, ctx context.Context, log *slog.Logger, duration time.Duration, outputFormat string, output io.Writer) error {
-	return sox.CaptureAudio(ctx, log, d, duration, outputFormat, output)
+func (d Device) CaptureAudio(sox *Sox, ctx context.Context, log *slog.Logger, output io.Writer) error {
+	return sox.CaptureAudio(ctx, log, d, output)
 }

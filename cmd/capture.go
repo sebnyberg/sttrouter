@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -16,39 +17,12 @@ import (
 
 // CaptureConfig holds capture specific configuration flags.
 type CaptureConfig struct {
-	// TargetFormat specifies the output format/container (wav or flac)
-	TargetFormat string `name:"t" usage:"Target format: wav or flac (defaults to file extension)"`
 	// Duration specifies the capture duration (e.g., "10s", "1m")
 	Duration string `name:"duration" value:"10s" usage:"Capture duration (e.g., 10s, 1m)"`
 	// Device specifies the audio device name (defaults to system default)
 	Device string `name:"device" usage:"Audio device name (defaults to system default)"`
 	// SampleRate specifies the sample rate in Hz (overrides device default)
 	SampleRate string `name:"rate" usage:"Sample rate in Hz (overrides device default)"`
-}
-
-// parse parses and validates the format configuration.
-func parseTargetFormat(c *CaptureConfig, outputFile string) (format string, err error) {
-	// Try to parse the format from the outputfile
-	extIdx := strings.LastIndexByte(outputFile, '.')
-	var fileFormat string
-	if extIdx != -1 {
-		ext := outputFile[extIdx+1:]
-		extLower := strings.ToLower(ext)
-		fileFormat = extLower
-	}
-
-	// If format is unspecified, use the file format
-	format = c.TargetFormat
-	if format == "" {
-		format = fileFormat
-	}
-
-	// Validate format
-	if format != "flac" && format != "wav" {
-		return "", errors.New("file format (--format or file extension) must be 'wav' or 'flac'")
-	}
-
-	return format, nil
 }
 
 // runCapture executes the audio capture logic.
@@ -94,13 +68,21 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 	}
 
 	// Parse format
-	format, err := parseTargetFormat(config, outputFile)
-	if err != nil {
-		return fmt.Errorf("failed to parse format: %w", err)
-	}
+	format := "flac"
 
-	// Sentinel: set config.Format to "invalid"
-	config.TargetFormat = "invalid"
+	// Determine output writer
+	var output io.Writer
+	var file *os.File
+	if outputFile == "-" {
+		output = os.Stdout
+	} else {
+		file, err = os.Create(outputFile)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
+		defer func() { _ = file.Close() }()
+		output = file
+	}
 
 	// Print individual fields to avoid JSON serialization issues
 	slog.Info("Starting audio capture",
@@ -109,7 +91,7 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		"format", format,
 		"output", outputFile)
 
-	err = selectedDevice.CaptureAudio(sox, ctx, logger, duration, format, outputFile)
+	err = selectedDevice.CaptureAudio(sox, ctx, logger, duration, format, output)
 	if err != nil {
 		slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
 		return fmt.Errorf("audio capture failed: %w", err)
@@ -137,18 +119,17 @@ func NewCaptureCommand() *cli.Command {
 
 The OUTPUT_FILE is a required positional argument that specifies where to send the audio output.
 Use "-" to output to stdout (similar to how ffmpeg works).
-Format is inferred from file extension when a regular file is specified,
-or must be specified with -t/--format when outputting to stdout.
+Output format is always FLAC.
 
 Examples:
-  # Output to file (format inferred from extension)
+  # Output to file
   sttrouter capture recording.flac
   
-  # Output to stdout (format must be specified)
-  sttrouter capture -t flac -
+  # Output to stdout
+  sttrouter capture -
   
-  # Pipe to another command (format must be specified)
-  sttrouter capture -t wav - | ffplay -`,
+  # Pipe to another command
+  sttrouter capture - | ffplay -`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
 			if c.NArg() != 1 {
@@ -156,6 +137,13 @@ Examples:
 			}
 
 			outputFile := c.Args().Get(0)
+
+			// Validate output file extension
+			if outputFile != "-" {
+				if !strings.HasSuffix(strings.ToLower(outputFile), ".flac") {
+					return fmt.Errorf("output file must have .flac extension")
+				}
+			}
 
 			if err := baseConfig.validate(); err != nil {
 				return err

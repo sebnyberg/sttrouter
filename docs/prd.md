@@ -77,7 +77,7 @@ The solution succeeds by providing flexibility in how transcribed text is delive
 ### 4. Audio capture
 
 **FR4.1:** Audio capture MUST use `sox`
-**FR4.2:** Audio capture MUST use streaming audio formats (WAV or FLAC)
+**FR4.2:** Audio capture MUST use streaming audio formats (FLAC)
 **FR4.3:** Audio capture MUST support output to file or stdout
 **FR4.4:** Audio capture MUST support streaming to a transcription service
 **FR4.5:** Audio capture MUST support manual start/stop

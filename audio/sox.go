@@ -14,44 +14,44 @@ import (
 	"time"
 )
 
-// Sox handles audio capture using sox
-type Sox struct {
-}
-
-// NewSox creates a new Sox instance
-func NewSox(ctx context.Context) (*Sox, error) {
-	return &Sox{}, nil
+// CaptureArgs holds the arguments for audio capture
+type CaptureArgs struct {
+	Device   Device
+	Duration time.Duration
+	Output   io.Writer
+	Channels int
+	BitDepth int
 }
 
 // CaptureAudio captures audio from the specified device to the output writer as raw PCM
-func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device, duration time.Duration, output io.Writer) (retErr error) {
-	if duration > 0 {
+func CaptureAudio(ctx context.Context, log *slog.Logger, args CaptureArgs) (retErr error) {
+	if args.Duration > 0 {
 		var cancel context.CancelCauseFunc
 		ctx, cancel = context.WithCancelCause(ctx)
 		defer func() { cancel(nil) }()
-		time.AfterFunc(duration, func() {
+		time.AfterFunc(args.Duration, func() {
 			cancel(errors.New("finished duration"))
 		})
 	}
-	args := []string{"-t", "coreaudio", device.Name}
+	cmdArgs := []string{"-t", "coreaudio", args.Device.Name}
 
 	// Set sample rate if provided
-	if device.SampleRate > 0 {
-		args = append(args, "-r", fmt.Sprintf("%d", device.SampleRate))
+	if args.Device.SampleRate > 0 {
+		cmdArgs = append(cmdArgs, "-r", fmt.Sprintf("%d", args.Device.SampleRate))
 	}
 
-	args = append(args, "-t", "raw", "-e", "signed-integer", "-b", "16", "-c", "2")
+	cmdArgs = append(cmdArgs, "-t", "raw", "-e", "signed-integer", "-b", strconv.Itoa(args.BitDepth), "-c", strconv.Itoa(args.Channels))
 
 	// Use "-" to output to stdout when writing to io.Writer
-	args = append(args, "-")
+	cmdArgs = append(cmdArgs, "-")
 
 	log.InfoContext(ctx, "Running sox",
-		"args", args,
-		"command", fmt.Sprintf("sox %s", strings.Join(args, " ")),
-		"device", device)
+		"args", cmdArgs,
+		"command", fmt.Sprintf("sox %s", strings.Join(cmdArgs, " ")),
+		"device", args.Device)
 
-	cmd := exec.Command("sox", args...)
-	cmd.Stdout = output
+	cmd := exec.Command("sox", cmdArgs...)
+	cmd.Stdout = args.Output
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -59,7 +59,7 @@ func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device,
 	if err := cmd.Start(); err != nil {
 		log.ErrorContext(ctx, "Sox start failed",
 			"error", err,
-			"device", device)
+			"device", args.Device)
 		return fmt.Errorf("sox start failed: %w", err)
 	}
 
@@ -75,7 +75,7 @@ func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device,
 			log.ErrorContext(ctx, "Sox execution failed",
 				"error", err,
 				"stderr", stderr.String(),
-				"device", device)
+				"device", args.Device)
 			return fmt.Errorf("sox capture failed: %s: %w", stderr.String(), ErrAudioCaptureFailed)
 		}
 	case <-ctx.Done():
@@ -93,7 +93,7 @@ func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device,
 }
 
 // ConvertAudio converts audio from sourceFormat to targetFormat using sox
-func (s *Sox) ConvertAudio(ctx context.Context, log *slog.Logger, reader io.Reader, writer io.Writer, sourceFormat, targetFormat string, sampleRate, channels, bitDepth int) error {
+func ConvertAudio(ctx context.Context, log *slog.Logger, reader io.Reader, writer io.Writer, sourceFormat, targetFormat string, sampleRate, channels, bitDepth int) error {
 	// Source format
 	args := []string{"-t", sourceFormat}
 	if sourceFormat == "raw" {

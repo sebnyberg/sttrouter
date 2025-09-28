@@ -27,8 +27,7 @@ type CaptureConfig struct {
 
 // runCapture executes the audio capture logic.
 func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, duration time.Duration) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
 
 	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
@@ -74,38 +73,38 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		"duration", duration,
 		"output", outputFile)
 
-	captureCtx, captureCancel := context.WithCancel(ctx)
-	defer captureCancel()
-	if duration != 0 {
-		t := time.AfterFunc(duration, func() {
-			captureCancel()
-		})
-		defer func() {
-			t.Stop()
-		}()
-	}
-
 	// Set up capture I/O
 	g := new(errgroup.Group)
 	captureReader, captureWriter := io.Pipe()
 
 	// Asynchronously read from the capture inputs into the Converter, which in
 	// turn writes to the FLAC output
-	outf, err := os.Create(outputFile)
-	if err != nil {
-		return fmt.Errorf("failed to create file, %w", err)
+	var writer io.Writer
+	var file *os.File
+	if outputFile == "-" {
+		writer = os.Stdout
+	} else {
+		var err error
+		file, err = os.Create(outputFile)
+		if err != nil {
+			return fmt.Errorf("failed to create file, %w", err)
+		}
+		writer = file
 	}
 	g.Go(func() error {
-		err := sox.ConvertAudio(ctx, logger, captureReader, outf, "raw", "flac", selectedDevice.SampleRate, 2, 16)
+		err := sox.ConvertAudio(ctx, logger, captureReader, writer, "raw", "flac", selectedDevice.SampleRate, 2, 16)
 		if err != nil {
 			return err
 		}
-		return outf.Close()
+		if file != nil {
+			return file.Close()
+		}
+		return nil
 	})
 
 	// Capture audio until duration is finished.
-	err = selectedDevice.CaptureAudio(sox, captureCtx, logger, captureWriter)
-	captureWriter.Close()
+	err = selectedDevice.CaptureAudio(sox, ctx, logger, duration, captureWriter)
+	_ = captureWriter.Close()
 	if err != nil {
 		slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
 		return fmt.Errorf("audio capture failed: %w", err)

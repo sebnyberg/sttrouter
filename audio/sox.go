@@ -1,8 +1,10 @@
 package audio
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os/exec"
 	"strings"
@@ -18,8 +20,8 @@ func NewSox(ctx context.Context) (*Sox, error) {
 	return &Sox{}, nil
 }
 
-// CaptureAudio captures audio from the specified device to the output file or stdout
-func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device, duration time.Duration, targetFormat, output string) error {
+// CaptureAudio captures audio from the specified device to the output writer
+func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device, duration time.Duration, targetFormat string, output io.Writer) error {
 	args := []string{"-t", "coreaudio", device.Name}
 
 	// Set sample rate if provided
@@ -29,7 +31,8 @@ func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device,
 
 	args = append(args, "-t", targetFormat)
 
-	args = append(args, output)
+	// Use "-" to output to stdout when writing to io.Writer
+	args = append(args, "-")
 
 	if duration > 0 {
 		args = append(args, "trim", "0", fmt.Sprintf("%.1f", duration.Seconds()))
@@ -41,13 +44,18 @@ func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device,
 		"device", device)
 
 	cmd := exec.CommandContext(ctx, "sox", args...)
-	outputBytes, err := cmd.CombinedOutput()
+	cmd.Stdout = output
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
 	if err != nil {
 		log.ErrorContext(ctx, "Sox execution failed",
 			"error", err,
-			"output", string(outputBytes),
+			"stderr", stderr.String(),
 			"device", device)
-		return fmt.Errorf("sox capture failed: %s: %w", string(outputBytes), ErrAudioCaptureFailed)
+		return fmt.Errorf("sox capture failed: %s: %w", stderr.String(), ErrAudioCaptureFailed)
 	}
 
 	return nil

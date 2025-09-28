@@ -3,6 +3,7 @@ package audio
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"time"
 )
@@ -38,6 +39,6 @@ func (d Device) MarshalJSON() ([]byte, error) {
 }
 
 // CaptureAudio captures audio from this device using the provided Sox instance
-func (d Device) CaptureAudio(sox *Sox, ctx context.Context, log *slog.Logger, duration time.Duration, container, output string) error {
-	return sox.CaptureAudio(ctx, log, d, duration, container, output)
+func (d Device) CaptureAudio(sox *Sox, ctx context.Context, log *slog.Logger, duration time.Duration, outputFormat string, output io.Writer) error {
+	return sox.CaptureAudio(ctx, log, d, duration, outputFormat, output)
 }

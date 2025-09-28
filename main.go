@@ -23,6 +23,7 @@ func main() {
 		Commands: []*cli.Command{
 			cmd.NewListDevicesCommand(),
 			cmd.NewCaptureCommand(),
+			cmd.NewTranscribeCommand(),
 		},
 	}
 

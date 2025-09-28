@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -89,12 +90,15 @@ func GetDevice(name string, spDevices []Device) (Device, error) {
 	return Device{}, ErrNoDefaultDevice
 }
 
-// CaptureAndConvert captures audio from the device and converts it to FLAC, optionally with silence splitting
-func CaptureAndConvert(ctx context.Context, logger *slog.Logger, device Device, enableSilence bool, silenceThreshold float64, silenceMinDuration time.Duration, writer io.Writer, duration time.Duration) error {
+// LimitedCapture captures raw audio from the device until silence is detected or duration expires
+func LimitedCapture(ctx context.Context, logger *slog.Logger, device Device, enableSilence bool, silenceThreshold float64, silenceMinDuration time.Duration, duration time.Duration) (io.Reader, error) {
 	sox, err := NewSox(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	// Buffer to collect raw audio
+	buffer := &bytes.Buffer{}
 
 	// Set up capture I/O
 	g := new(errgroup.Group)
@@ -111,11 +115,9 @@ func CaptureAndConvert(ctx context.Context, logger *slog.Logger, device Device, 
 		})
 
 		g.Go(func() error {
-			err := sox.ConvertAudio(ctx, logger, silenceReader, writer, "raw", "flac", device.SampleRate, 2, 16)
-			if err != nil {
-				return err
-			}
-			return nil
+			defer func() { _ = silenceWriter.Close() }()
+			_, err := io.Copy(buffer, silenceReader)
+			return err
 		})
 
 		g.Go(func() error {
@@ -126,11 +128,8 @@ func CaptureAndConvert(ctx context.Context, logger *slog.Logger, device Device, 
 		})
 	} else {
 		g.Go(func() error {
-			err := sox.ConvertAudio(ctx, logger, captureReader, writer, "raw", "flac", device.SampleRate, 2, 16)
-			if err != nil {
-				return err
-			}
-			return nil
+			_, err := io.Copy(buffer, captureReader)
+			return err
 		})
 	}
 
@@ -138,12 +137,12 @@ func CaptureAndConvert(ctx context.Context, logger *slog.Logger, device Device, 
 	err = device.CaptureAudio(sox, captureCtx, logger, duration, captureWriter)
 	_ = captureWriter.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := g.Wait(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return buffer, nil
 }

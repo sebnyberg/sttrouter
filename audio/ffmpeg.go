@@ -24,14 +24,14 @@ func NewFFmpeg(ctx context.Context) (*FFmpeg, error) {
 	return &FFmpeg{output: string(output)}, nil
 }
 
-// ListDeviceNames returns the list of input device names
-func (f *FFmpeg) ListDeviceNames() []string {
-	return parseFFmpegDeviceNames(f.output)
+// ListDevices returns the list of input devices
+func (f *FFmpeg) ListDevices() []Device {
+	return parseFFmpegDevices(f.output)
 }
 
-// parseFFmpegDeviceNames parses ffmpeg output for device names
-func parseFFmpegDeviceNames(output string) []string {
-	var devices []string
+// parseFFmpegDevices parses ffmpeg output for devices
+func parseFFmpegDevices(output string) []Device {
+	var devices []Device
 	lines := strings.Split(output, "\n")
 
 	inAudioSection := false
@@ -49,7 +49,7 @@ func parseFFmpegDeviceNames(output string) []string {
 			matches := re.FindStringSubmatch(line)
 			if len(matches) == 3 {
 				name := strings.TrimSpace(matches[2])
-				devices = append(devices, name)
+				devices = append(devices, Device{Name: name, Mode: 0})
 			}
 		}
 	}

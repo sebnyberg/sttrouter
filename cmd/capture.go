@@ -12,7 +12,6 @@ import (
 	"github.com/sebnyberg/flagtags"
 	"github.com/sebnyberg/sttrouter/audio"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/sync/errgroup"
 )
 
 // CaptureConfig holds capture specific configuration flags.
@@ -42,11 +41,6 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 	sp, err := audio.NewSystemProfiler(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize system profiler: %w", err)
-	}
-
-	sox, err := audio.NewSox(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to initialize sox: %w", err)
 	}
 
 	spDevices := sp.ListDevices()
@@ -90,10 +84,6 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		"output", outputFile,
 		"silence_enabled", config.EnableSilence)
 
-	// Set up capture I/O
-	g := new(errgroup.Group)
-	captureReader, captureWriter := io.Pipe()
-
 	// Asynchronously read from the capture inputs into the Converter, which in
 	// turn writes to the FLAC output
 	var writer io.Writer
@@ -107,58 +97,13 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 			return fmt.Errorf("failed to create file, %w", err)
 		}
 		writer = file
+		defer func() { _ = file.Close() }()
 	}
 
-	captureCtx, captureCancel := context.WithCancel(ctx)
-	defer captureCancel()
-	if config.EnableSilence {
-		// Set up silence splitter
-		silenceReader, silenceWriter := io.Pipe()
-		splitter := audio.NewSilenceSplitter(ctx, 2, 16, config.SilenceThreshold, minSilenceDuration, selectedDevice.SampleRate, func(data []byte) {
-			_, _ = silenceWriter.Write(data)
-			captureCancel()
-		})
-
-		g.Go(func() error {
-			err := sox.ConvertAudio(ctx, logger, silenceReader, writer, "raw", "flac", selectedDevice.SampleRate, 2, 16)
-			if err != nil {
-				return err
-			}
-			if file != nil {
-				return file.Close()
-			}
-			return nil
-		})
-
-		g.Go(func() error {
-			defer func() { _ = silenceWriter.Close() }()
-			_, err := io.Copy(splitter, captureReader)
-			splitter.Flush() // Flush any remaining data
-			return err
-		})
-	} else {
-		g.Go(func() error {
-			err := sox.ConvertAudio(ctx, logger, captureReader, writer, "raw", "flac", selectedDevice.SampleRate, 2, 16)
-			if err != nil {
-				return err
-			}
-			if file != nil {
-				return file.Close()
-			}
-			return nil
-		})
-	}
-
-	// Capture audio until duration is finished.
-	err = selectedDevice.CaptureAudio(sox, captureCtx, logger, duration, captureWriter)
-	_ = captureWriter.Close()
+	err = audio.CaptureAndConvert(ctx, logger, selectedDevice, config.EnableSilence, config.SilenceThreshold, minSilenceDuration, writer, duration)
 	if err != nil {
 		slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
 		return fmt.Errorf("audio capture failed: %w", err)
-	}
-
-	if err := g.Wait(); err != nil {
-		return err
 	}
 
 	if baseConfig.Verbose {

@@ -3,6 +3,7 @@ package audio
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // Sox handles audio capture using sox
@@ -22,7 +24,15 @@ func NewSox(ctx context.Context) (*Sox, error) {
 }
 
 // CaptureAudio captures audio from the specified device to the output writer as raw PCM
-func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device, output io.Writer) (retErr error) {
+func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device, duration time.Duration, output io.Writer) (retErr error) {
+	if duration > 0 {
+		var cancel context.CancelCauseFunc
+		ctx, cancel = context.WithCancelCause(ctx)
+		defer func() { cancel(nil) }()
+		time.AfterFunc(duration, func() {
+			cancel(errors.New("finished duration"))
+		})
+	}
 	args := []string{"-t", "coreaudio", device.Name}
 
 	// Set sample rate if provided

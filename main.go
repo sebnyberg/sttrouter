@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/sebnyberg/sttrouter/cmd"
@@ -21,11 +21,13 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			cmd.NewListDevicesCommand(),
+			cmd.NewCaptureCommand(),
 		},
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		fmt.Println(err)
+		logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
+		logger.Error("Application error", "error", err)
 		os.Exit(1)
 	}
 }

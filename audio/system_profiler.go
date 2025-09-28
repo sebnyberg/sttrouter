@@ -22,6 +22,7 @@ func parseSystemProfilerDevices(output []byte) ([]Device, error) {
 				DefaultOutputDevice string `json:"coreaudio_default_audio_output_device"`
 				DeviceInput         int    `json:"coreaudio_device_input"`
 				DeviceOutput        int    `json:"coreaudio_device_output"`
+				SampleRate          int    `json:"coreaudio_device_srate"`
 			} `json:"_items"`
 		} `json:"SPAudioDataType"`
 	}
@@ -46,7 +47,7 @@ func parseSystemProfilerDevices(output []byte) ([]Device, error) {
 			if item.DefaultOutputDevice == "spaudio_yes" {
 				mode |= DeviceFlagCurrentSink
 			}
-			devices = append(devices, Device{Name: item.Name, Mode: mode})
+			devices = append(devices, Device{Name: item.Name, Mode: mode, SampleRate: item.SampleRate})
 		}
 	}
 

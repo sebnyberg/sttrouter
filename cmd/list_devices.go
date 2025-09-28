@@ -107,7 +107,7 @@ func runListDevices(baseConfig *Config, config *ListDevicesConfig) error {
 	}
 
 	if baseConfig.Verbose {
-		fmt.Printf("Found %d devices\n", len(devices))
+		slog.Info("Found devices", "count", len(devices))
 	}
 
 	fmt.Print(output)

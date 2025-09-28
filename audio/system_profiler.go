@@ -32,6 +32,7 @@ func parseSystemProfilerDevices(output []byte) ([]Device, error) {
 	}
 
 	var devices []Device
+	index := 0
 	for _, audioType := range data.SPAudioDataType {
 		for _, item := range audioType.Items {
 			mode := uint(0)
@@ -47,7 +48,8 @@ func parseSystemProfilerDevices(output []byte) ([]Device, error) {
 			if item.DefaultOutputDevice == "spaudio_yes" {
 				mode |= DeviceFlagCurrentSink
 			}
-			devices = append(devices, Device{Name: item.Name, Mode: mode, SampleRate: item.SampleRate})
+			devices = append(devices, Device{Name: item.Name, Mode: mode, SampleRate: item.SampleRate, Index: index})
+			index++
 		}
 	}
 

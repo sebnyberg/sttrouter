@@ -15,12 +15,12 @@ sttrouter combines audio capture capabilities with transcription services to pro
   - Clipboard mode for direct system clipboard integration
   - Stdout mode for command-line workflows and piping
   - File mode for direct file output
-- **Cross-platform Audio Support**: Uses FFmpeg for audio capture
+- **Cross-platform Audio Support**: Uses Sox for audio capture
 - **VSCode Extension Ready**: Designed for integration with development environments
 
 ## Prerequisites
 
-- **FFmpeg**: Required for audio capture and processing
+- **Sox**: Required for audio capture and processing
 - **Transcription service credentials**: API keys for your chosen transcription service
 
 ## Installation
@@ -98,10 +98,10 @@ The Nix environment will automatically provide Go, FFmpeg, and golangci-lint in 
 ### Option 2: Manual Development Setup
 
 1. Install Go 1.24.x from [golang.org](https://golang.org/dl/)
-2. Install FFmpeg:
+2. Install Sox:
    ```bash
    # macOS with Homebrew
-   brew install ffmpeg
+   brew install sox
    ```
 3. Clone and build:
    ```bash
@@ -175,7 +175,7 @@ The project uses Nix for reproducible development environments. When you enter t
 The Nix environment provides:
 - **Go 1.24.x**: Primary development language
 - **golangci-lint**: Code linting and quality checks
-- **FFmpeg**: Audio processing for runtime functionality
+- **Sox**: Audio processing for runtime functionality
 - **Git & curl**: Development utilities
 
 ### Available Make Commands
@@ -230,4 +230,4 @@ _TODO: Add license information_
 - [OpenAI Whisper API](https://platform.openai.com/docs/guides/speech-to-text) (one supported transcription service)
 - [Azure Speech Service](https://azure.microsoft.com/en-us/products/ai-services/ai-speech) (alternative transcription service)
 - [Cobra CLI Framework](https://github.com/spf13/cobra)
-- [FFmpeg](https://ffmpeg.org/)
+- [Sox](https://sox.sourceforge.net/)

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sebnyberg/flagtags"
 	"github.com/sebnyberg/sttrouter/audio"
@@ -14,16 +16,18 @@ import (
 
 // CaptureConfig holds capture specific configuration flags.
 type CaptureConfig struct {
-	// Format specifies the output format/container (wav or flac)
-	Format string `name:"f" usage:"Output format/container: wav or flac (defaults to file extension)"`
+	// TargetFormat specifies the output format/container (wav or flac)
+	TargetFormat string `name:"t" usage:"Target format: wav or flac (defaults to file extension)"`
 	// Duration specifies the capture duration (e.g., "10s", "1m")
 	Duration string `name:"duration" value:"10s" usage:"Capture duration (e.g., 10s, 1m)"`
 	// Device specifies the audio device name (defaults to system default)
 	Device string `name:"device" usage:"Audio device name (defaults to system default)"`
+	// SampleRate specifies the sample rate in Hz (overrides device default)
+	SampleRate string `name:"rate" usage:"Sample rate in Hz (overrides device default)"`
 }
 
 // parse parses and validates the format configuration.
-func parseOutputFormat(c *CaptureConfig, outputFile string) (format string, err error) {
+func parseTargetFormat(c *CaptureConfig, outputFile string) (format string, err error) {
 	// Try to parse the format from the outputfile
 	extIdx := strings.LastIndexByte(outputFile, '.')
 	var fileFormat string
@@ -34,7 +38,8 @@ func parseOutputFormat(c *CaptureConfig, outputFile string) (format string, err 
 	}
 
 	// If format is unspecified, use the file format
-	if c.Format == "" {
+	format = c.TargetFormat
+	if format == "" {
 		format = fileFormat
 	}
 
@@ -47,7 +52,7 @@ func parseOutputFormat(c *CaptureConfig, outputFile string) (format string, err 
 }
 
 // runCapture executes the audio capture logic.
-func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string) error {
+func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, duration time.Duration) error {
 	ctx := context.Background()
 
 	logger := baseConfig.getLogger()
@@ -79,23 +84,32 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string) er
 		}
 	}
 
+	// Parse and set sample rate if provided
+	if config.SampleRate != "" {
+		rate, err := strconv.Atoi(config.SampleRate)
+		if err != nil {
+			return fmt.Errorf("invalid sample rate: %w", err)
+		}
+		selectedDevice.SampleRate = rate
+	}
+
 	// Parse format
-	format, err := parseOutputFormat(config, outputFile)
+	format, err := parseTargetFormat(config, outputFile)
 	if err != nil {
 		return fmt.Errorf("failed to parse format: %w", err)
 	}
 
 	// Sentinel: set config.Format to "invalid"
-	config.Format = "invalid"
+	config.TargetFormat = "invalid"
 
 	// Print individual fields to avoid JSON serialization issues
 	slog.Info("Starting audio capture",
 		"device_name", selectedDevice.Name,
-		"duration", config.Duration,
+		"duration", duration,
 		"format", format,
 		"output", outputFile)
 
-	err = selectedDevice.CaptureAudio(sox, ctx, logger, config.Duration, format, outputFile)
+	err = selectedDevice.CaptureAudio(sox, ctx, logger, duration, format, outputFile)
 	if err != nil {
 		slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
 		return fmt.Errorf("audio capture failed: %w", err)
@@ -124,17 +138,17 @@ func NewCaptureCommand() *cli.Command {
 The OUTPUT_FILE is a required positional argument that specifies where to send the audio output.
 Use "-" to output to stdout (similar to how ffmpeg works).
 Format is inferred from file extension when a regular file is specified,
-or must be specified with -f/--format when outputting to stdout.
+or must be specified with -t/--format when outputting to stdout.
 
 Examples:
   # Output to file (format inferred from extension)
   sttrouter capture recording.flac
   
   # Output to stdout (format must be specified)
-  sttrouter capture -f flac -
+  sttrouter capture -t flac -
   
   # Pipe to another command (format must be specified)
-  sttrouter capture -f wav - | ffplay -`,
+  sttrouter capture -t wav - | ffplay -`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
 			if c.NArg() != 1 {
@@ -147,7 +161,12 @@ Examples:
 				return err
 			}
 
-			return runCapture(&baseConfig, &captureConfig, outputFile)
+			duration, err := time.ParseDuration(captureConfig.Duration)
+			if err != nil {
+				return fmt.Errorf("invalid duration: %w", err)
+			}
+
+			return runCapture(&baseConfig, &captureConfig, outputFile, duration)
 		},
 	}
 }

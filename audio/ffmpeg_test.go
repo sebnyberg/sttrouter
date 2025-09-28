@@ -33,15 +33,15 @@ Error opening input file .
 Error opening input files: Input/output error
 `
 
-func TestParseFFmpegDeviceNames(t *testing.T) {
-	expected := []string{
-		"MacBook Pro Microphone",
-		"Microsoft Teams Audio",
-		"INZONE H3",
-		"C922 Pro Stream Webcam",
+func TestParseFFmpegDevices(t *testing.T) {
+	expected := []Device{
+		{Name: "MacBook Pro Microphone", Mode: 0},
+		{Name: "Microsoft Teams Audio", Mode: 0},
+		{Name: "INZONE H3", Mode: 0},
+		{Name: "C922 Pro Stream Webcam", Mode: 0},
 	}
-	actual := parseFFmpegDeviceNames(ffmpegOutputSample)
+	actual := parseFFmpegDevices(ffmpegOutputSample)
 	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("parseFFmpegDeviceNames() = %v, want %v", actual, expected)
+		t.Errorf("parseFFmpegDevices() = %v, want %v", actual, expected)
 	}
 }

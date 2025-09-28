@@ -13,3 +13,6 @@ var ErrOutputParsingFailed = errors.New("output parsing failed")
 
 // ErrMultipleCurrentDevices indicates that multiple devices are marked as current for the same direction
 var ErrMultipleCurrentDevices = errors.New("multiple devices marked as current for the same direction")
+
+// ErrNoDefaultDevice indicates that no default device is set for the requested direction
+var ErrNoDefaultDevice = errors.New("no default device set")

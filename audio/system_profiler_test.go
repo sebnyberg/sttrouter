@@ -74,12 +74,12 @@ const systemProfilerOutputSample = `{
 
 func TestParseSystemProfilerDevices(t *testing.T) {
 	expectedDevices := []Device{
-		{Name: "DELL U2724DE", Mode: DeviceFlagOutput},
-		{Name: "INZONE H3", Mode: DeviceFlagInput | DeviceFlagOutput | DeviceFlagCurrentInput | DeviceFlagCurrentOutput},
-		{Name: "C922 Pro Stream Webcam", Mode: DeviceFlagInput},
-		{Name: "MacBook Pro Microphone", Mode: DeviceFlagInput},
-		{Name: "MacBook Pro Speakers", Mode: DeviceFlagOutput},
-		{Name: "Microsoft Teams Audio", Mode: DeviceFlagInput | DeviceFlagOutput},
+		{Name: "DELL U2724DE", Mode: DeviceFlagSink},
+		{Name: "INZONE H3", Mode: DeviceFlagSource | DeviceFlagSink | DeviceFlagCurrentSource | DeviceFlagCurrentSink},
+		{Name: "C922 Pro Stream Webcam", Mode: DeviceFlagSource},
+		{Name: "MacBook Pro Microphone", Mode: DeviceFlagSource},
+		{Name: "MacBook Pro Speakers", Mode: DeviceFlagSink},
+		{Name: "Microsoft Teams Audio", Mode: DeviceFlagSource | DeviceFlagSink},
 	}
 	actualDevices, err := parseSystemProfilerDevices([]byte(systemProfilerOutputSample))
 	if err != nil {

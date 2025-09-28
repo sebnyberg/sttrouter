@@ -2,16 +2,15 @@ package audio
 
 import (
 	"encoding/json"
-	"sort"
 )
 
 // DeviceFlag represents device capabilities and defaults as bit flags
 const (
 	DeviceFlagUnset         = 0
-	DeviceFlagInput         = 1 << 0
-	DeviceFlagOutput        = 1 << 1
-	DeviceFlagCurrentInput  = 1 << 2
-	DeviceFlagCurrentOutput = 1 << 3
+	DeviceFlagSource        = 1 << 0
+	DeviceFlagSink          = 1 << 1
+	DeviceFlagCurrentSource = 1 << 2
+	DeviceFlagCurrentSink   = 1 << 3
 )
 
 // Device represents an audio device with its name and mode flags
@@ -24,10 +23,10 @@ type Device struct {
 func (d Device) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"name":           d.Name,
-		"input":          d.Mode&DeviceFlagInput != 0,
-		"output":         d.Mode&DeviceFlagOutput != 0,
-		"current_input":  d.Mode&DeviceFlagCurrentInput != 0,
-		"current_output": d.Mode&DeviceFlagCurrentOutput != 0,
+		"source":         d.Mode&DeviceFlagSource != 0,
+		"sink":           d.Mode&DeviceFlagSink != 0,
+		"current_source": d.Mode&DeviceFlagCurrentSource != 0,
+		"current_sink":   d.Mode&DeviceFlagCurrentSink != 0,
 	})
 }
 
@@ -38,60 +37,17 @@ func (d *Device) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	d.Name = m["name"].(string)
-	if input, ok := m["input"].(bool); ok && input {
-		d.Mode |= DeviceFlagInput
+	if source, ok := m["source"].(bool); ok && source {
+		d.Mode |= DeviceFlagSource
 	}
-	if output, ok := m["output"].(bool); ok && output {
-		d.Mode |= DeviceFlagOutput
+	if sink, ok := m["sink"].(bool); ok && sink {
+		d.Mode |= DeviceFlagSink
 	}
-	if currentInput, ok := m["current_input"].(bool); ok && currentInput {
-		d.Mode |= DeviceFlagCurrentInput
+	if currentSource, ok := m["current_source"].(bool); ok && currentSource {
+		d.Mode |= DeviceFlagCurrentSource
 	}
-	if currentOutput, ok := m["current_output"].(bool); ok && currentOutput {
-		d.Mode |= DeviceFlagCurrentOutput
+	if currentSink, ok := m["current_sink"].(bool); ok && currentSink {
+		d.Mode |= DeviceFlagCurrentSink
 	}
 	return nil
-}
-
-// ListDevices merges device lists from ffmpeg and system-profiler, validates current devices, and sorts by name.
-func ListDevices(ffmpegDevices, spDevices []Device) ([]Device, error) {
-	// Merge devices from both sources
-	deviceModes := make(map[string]uint)
-	for _, dev := range ffmpegDevices {
-		deviceModes[dev.Name] |= dev.Mode
-	}
-	for _, dev := range spDevices {
-		deviceModes[dev.Name] |= dev.Mode
-	}
-
-	// Check for more than one current device per direction
-	currentInputCount := 0
-	currentOutputCount := 0
-	for _, mode := range deviceModes {
-		if mode&DeviceFlagCurrentInput != 0 {
-			currentInputCount++
-		}
-		if mode&DeviceFlagCurrentOutput != 0 {
-			currentOutputCount++
-		}
-	}
-	if currentInputCount > 1 {
-		return nil, ErrMultipleCurrentDevices
-	}
-	if currentOutputCount > 1 {
-		return nil, ErrMultipleCurrentDevices
-	}
-
-	// Create final device list
-	devices := make([]Device, 0, len(deviceModes))
-	for name, mode := range deviceModes {
-		devices = append(devices, Device{Name: name, Mode: mode})
-	}
-
-	// Sort by name
-	sort.Slice(devices, func(i, j int) bool {
-		return devices[i].Name < devices[j].Name
-	})
-
-	return devices, nil
 }

@@ -2,74 +2,22 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"os"
-
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-// Config holds the global application configuration.
-// This structure enables clean separation between CLI parsing and business logic.
-type Config struct {
-	// LogLevel defines the minimum log level to output (debug, info, warn, error)
-	LogLevel string `flag:"log-level" env:"LOG_LEVEL" default:"info"`
+// ConfigKey is the context key for the config
+type ConfigKey struct{}
 
-	// LogFormat specifies the log output format (text, json)
-	LogFormat string `flag:"log-format" env:"LOG_FORMAT" default:"text"`
+// EnvPrefix is the prefix for environment variables
+const EnvPrefix = "STTR"
 
-	// Verbose enables more detailed logging and output
-	Verbose bool `flag:"verbose" env:"VERBOSE" default:"false"`
-}
-
-// Validate validates the configuration and sets defaults.
-func (c *Config) Validate() error {
-	// Validate log level
-	switch c.LogLevel {
-	case "debug", "info", "warn", "error":
-		// Valid log levels
-	default:
-		return fmt.Errorf("invalid log level: %s (valid values: debug, info, warn, error)", c.LogLevel)
+// getConfigFromContext retrieves the config from the command context
+func getConfigFromContext(ctx context.Context) *Config {
+	if config, ok := ctx.Value(ConfigKey{}).(*Config); ok {
+		return config
 	}
-
-	// Validate log format
-	switch c.LogFormat {
-	case "text", "json":
-		// Valid log formats
-	default:
-		return fmt.Errorf("invalid log format: %s (valid values: text, json)", c.LogFormat)
-	}
-
 	return nil
-}
-
-// SetupLogger configures the global logger based on configuration.
-func (c *Config) SetupLogger() {
-	// Determine log level
-	var level slog.Level
-	switch c.LogLevel {
-	case "debug":
-		level = slog.LevelDebug
-	case "info":
-		level = slog.LevelInfo
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	}
-
-	// Configure handler based on format
-	var handler slog.Handler
-	opts := &slog.HandlerOptions{Level: level}
-
-	if c.LogFormat == "json" {
-		handler = slog.NewJSONHandler(os.Stderr, opts)
-	} else {
-		handler = slog.NewTextHandler(os.Stderr, opts)
-	}
-
-	// Set the default logger
-	slog.SetDefault(slog.New(handler))
 }
 
 // rootCmd represents the base command when called without any subcommands.
@@ -88,56 +36,56 @@ Usage:
 Available Commands:
   help        Help about any command
 
-Flags:
-  --device-source string   Device enumeration source (auto, ffmpeg, system-profiler) (default "auto")
-  -h, --help               help for sttrouter
-  --log-format string      Set log format (text, json) (default "text")
-  --log-level string       Set log level (debug, info, warn, error) (default "info")
-  -v, --verbose            Enable verbose output`,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Access the bound configuration
-		config, err := getConfig(cmd)
-		if err != nil {
-			return err
-		}
-
-		// Validate the configuration
-		if err := config.Validate(); err != nil {
-			return err
-		}
-
-		// Setup logger based on configuration
-		config.SetupLogger()
-
-		return nil
-	},
-}
-
-// getConfig retrieves the bound configuration from the cobra command.
-func getConfig(cmd *cobra.Command) (*Config, error) {
-	config := &Config{}
-
-	// Bind flags to config struct
-	config.Verbose, _ = cmd.Flags().GetBool("verbose")
-	config.LogLevel, _ = cmd.Flags().GetString("log-level")
-	config.LogFormat, _ = cmd.Flags().GetString("log-format")
-
-	return config, nil
+ Flags:
+   -h, --help               help for sttrouter
+   --log-format string      Set log format (text, json) (default "text")
+   --log-level string       Set log level (debug, info, warn, error) (default "info")
+   -v, --verbose            Enable verbose output`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	err := rootCmd.ExecuteContext(context.Background())
-	if err != nil {
-		os.Exit(1)
-	}
+func Execute() error {
+	return rootCmd.Execute()
 }
 
 func init() {
-	// Define persistent flags for the root command
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
+	// Define flags
 	rootCmd.PersistentFlags().String("log-level", "info", "Set log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().String("log-format", "text", "Set log format (text, json)")
-	rootCmd.PersistentFlags().String("device-source", "auto", "Device enumeration source (auto, ffmpeg, system-profiler)")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
+
+	// Setup config in PersistentPreRunE
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		// Initialize viper
+		viper.SetEnvPrefix(EnvPrefix)
+		viper.AutomaticEnv()
+
+		// Bind flags (map hyphenated flag names to nested viper keys)
+		flagMappings := map[string]string{
+			"log.level":  "log-level",
+			"log.format": "log-format",
+			"verbose":    "verbose",
+		}
+		for viperKey, flagName := range flagMappings {
+			_ = viper.BindPFlag(viperKey, rootCmd.PersistentFlags().Lookup(flagName))
+		}
+
+		// Parse config
+		config := &Config{}
+		if err := viper.Unmarshal(config); err != nil {
+			return err
+		}
+
+		// Validate config
+		if err := config.validate(); err != nil {
+			return err
+		}
+
+		// Set config in context
+		ctx := context.WithValue(cmd.Context(), ConfigKey{}, config)
+		cmd.SetContext(ctx)
+
+		return nil
+	}
 }

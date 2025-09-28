@@ -1,6 +1,13 @@
 package audio
 
-import "context"
+import (
+	"context"
+	"io"
+	"log/slog"
+	"time"
+
+	"golang.org/x/sync/errgroup"
+)
 
 func ListDevices() ([]Device, error) {
 	sp, err := NewSystemProfiler(context.Background())
@@ -80,4 +87,63 @@ func GetDevice(name string, spDevices []Device) (Device, error) {
 		}
 	}
 	return Device{}, ErrNoDefaultDevice
+}
+
+// CaptureAndConvert captures audio from the device and converts it to FLAC, optionally with silence splitting
+func CaptureAndConvert(ctx context.Context, logger *slog.Logger, device Device, enableSilence bool, silenceThreshold float64, silenceMinDuration time.Duration, writer io.Writer, duration time.Duration) error {
+	sox, err := NewSox(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Set up capture I/O
+	g := new(errgroup.Group)
+	captureReader, captureWriter := io.Pipe()
+
+	captureCtx, captureCancel := context.WithCancel(ctx)
+	defer captureCancel()
+	if enableSilence {
+		// Set up silence splitter
+		silenceReader, silenceWriter := io.Pipe()
+		splitter := NewSilenceSplitter(ctx, 2, 16, silenceThreshold, silenceMinDuration, device.SampleRate, func(data []byte) {
+			_, _ = silenceWriter.Write(data)
+			captureCancel()
+		})
+
+		g.Go(func() error {
+			err := sox.ConvertAudio(ctx, logger, silenceReader, writer, "raw", "flac", device.SampleRate, 2, 16)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+
+		g.Go(func() error {
+			defer func() { _ = silenceWriter.Close() }()
+			_, err := io.Copy(splitter, captureReader)
+			splitter.Flush() // Flush any remaining data
+			return err
+		})
+	} else {
+		g.Go(func() error {
+			err := sox.ConvertAudio(ctx, logger, captureReader, writer, "raw", "flac", device.SampleRate, 2, 16)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+
+	// Capture audio until duration is finished.
+	err = device.CaptureAudio(sox, captureCtx, logger, duration, captureWriter)
+	_ = captureWriter.Close()
+	if err != nil {
+		return err
+	}
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	return nil
 }

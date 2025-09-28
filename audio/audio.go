@@ -1,64 +1,18 @@
 package audio
 
-import "sort"
+import "context"
 
-// ListDevices merges device lists from ffmpeg and system-profiler, validates current devices, and sorts by name.
-func ListDevices(ffmpegDevices, spDevices []Device) ([]Device, error) {
-	// Merge devices from both sources
-	deviceModes := make(map[string]uint)
-	deviceSampleRates := make(map[string]int)
-	deviceIndices := make(map[string]string)
-
-	for _, dev := range ffmpegDevices {
-		deviceModes[dev.Name] |= dev.Mode
-		deviceIndices[dev.Name] = dev.Index // Store the ffmpeg device index
+func ListDevices() ([]Device, error) {
+	sp, err := NewSystemProfiler(context.Background())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, dev := range spDevices {
-		deviceModes[dev.Name] |= dev.Mode
-		deviceSampleRates[dev.Name] = dev.SampleRate // Safe: ffmpeg devices have no sample rate info, only spDevices provide it
-	}
-
-	// Check for more than one current device per direction
-	currentSourceCount := 0
-	currentSinkCount := 0
-	for _, mode := range deviceModes {
-		if mode&DeviceFlagCurrentSource != 0 {
-			currentSourceCount++
-		}
-		if mode&DeviceFlagCurrentSink != 0 {
-			currentSinkCount++
-		}
-	}
-	if currentSourceCount > 1 {
-		return nil, ErrMultipleCurrentDevices
-	}
-	if currentSinkCount > 1 {
-		return nil, ErrMultipleCurrentDevices
-	}
-
-	// Create final device list
-	devices := make([]Device, 0, len(deviceModes))
-	for name, mode := range deviceModes {
-		devices = append(devices, Device{
-			Name:       name,
-			Mode:       mode,
-			SampleRate: deviceSampleRates[name], // Safe: deviceSampleRates[name] set from spDevices (non-zero) or 0 for ffmpeg-only devices
-			Index:      deviceIndices[name],     // Include the ffmpeg device index
-		})
-	}
-
-	// Sort by name
-	sort.Slice(devices, func(i, j int) bool {
-		return devices[i].Name < devices[j].Name
-	})
-
-	return devices, nil
+	return sp.ListDevices(), nil
 }
 
-// ListSinks returns devices that can act as audio sinks (outputs)
-func ListSinks(ffmpegDevices, spDevices []Device) ([]Device, error) {
-	devices, err := ListDevices(ffmpegDevices, spDevices)
+func ListSinks() ([]Device, error) {
+	devices, err := ListDevices()
 	if err != nil {
 		return nil, err
 	}
@@ -72,8 +26,8 @@ func ListSinks(ffmpegDevices, spDevices []Device) ([]Device, error) {
 }
 
 // ListSources returns devices that can act as audio sources (inputs)
-func ListSources(ffmpegDevices, spDevices []Device) ([]Device, error) {
-	devices, err := ListDevices(ffmpegDevices, spDevices)
+func ListSources() ([]Device, error) {
+	devices, err := ListDevices()
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +41,8 @@ func ListSources(ffmpegDevices, spDevices []Device) ([]Device, error) {
 }
 
 // GetDefaultSink returns the current default sink device
-func GetDefaultSink(ffmpegDevices, spDevices []Device) (Device, error) {
-	devices, err := ListDevices(ffmpegDevices, spDevices)
+func GetDefaultSink() (Device, error) {
+	devices, err := ListDevices()
 	if err != nil {
 		return Device{}, err
 	}
@@ -101,8 +55,8 @@ func GetDefaultSink(ffmpegDevices, spDevices []Device) (Device, error) {
 }
 
 // GetDefaultSource returns the current default source device
-func GetDefaultSource(ffmpegDevices, spDevices []Device) (Device, error) {
-	devices, err := ListDevices(ffmpegDevices, spDevices)
+func GetDefaultSource(spDevices []Device) (Device, error) {
+	devices, err := ListDevices()
 	if err != nil {
 		return Device{}, err
 	}
@@ -115,8 +69,8 @@ func GetDefaultSource(ffmpegDevices, spDevices []Device) (Device, error) {
 }
 
 // GetDevice returns the device with the specified name
-func GetDevice(name string, ffmpegDevices, spDevices []Device) (Device, error) {
-	devices, err := ListDevices(ffmpegDevices, spDevices)
+func GetDevice(name string, spDevices []Device) (Device, error) {
+	devices, err := ListDevices()
 	if err != nil {
 		return Device{}, err
 	}

@@ -16,14 +16,14 @@
           buildInputs = [
             pkgs.go
             pkgs.golangci-lint
-            pkgs.ffmpeg
             pkgs.git
             pkgs.curl
+            pkgs.sox
           ];
 
           shellHook = ''
             echo "🚀 sttrouter development environment loaded"
-            echo "Available tools: go, golangci-lint, ffmpeg, git, curl"
+            echo "Available tools: go, golangci-lint, git, curl, sox"
             echo "Run 'make help' for available commands"
           '';
         };

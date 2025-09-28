@@ -20,7 +20,7 @@ type Device struct {
 	Name       string
 	Mode       uint
 	SampleRate int
-	Index      string // Index/number used by ffmpeg
+	Index      int // Index used by sox for coreaudio
 }
 
 // MarshalJSON custom marshals Device to JSON with readable flags
@@ -36,7 +36,7 @@ func (d Device) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// CaptureAudio captures audio from this device using the provided FFmpeg instance
-func (d Device) CaptureAudio(ffmpeg *FFmpeg, ctx context.Context, log *slog.Logger, duration, container, codec, output string) error {
-	return ffmpeg.CaptureAudio(ctx, log, d, duration, container, codec, output)
+// CaptureAudio captures audio from this device using the provided Sox instance
+func (d Device) CaptureAudio(sox *Sox, ctx context.Context, log *slog.Logger, duration, container, output string) error {
+	return sox.CaptureAudio(ctx, log, d, duration, container, output)
 }

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -77,24 +76,10 @@ func (c *ListDevicesConfig) validate() error {
 
 // runListDevices executes the device listing logic.
 func runListDevices(baseConfig *Config, config *ListDevicesConfig) error {
-	ctx := context.Background()
-
 	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
 
-	ffmpeg, err := audio.NewFFmpeg(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list devices with ffmpeg: %w", err)
-	}
-
-	sp, err := audio.NewSystemProfiler(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list devices with system_profiler: %w", err)
-	}
-
-	ffmpegDevices := ffmpeg.ListDevices()
-	spDevices := sp.ListDevices()
-	devices, err := audio.ListDevices(ffmpegDevices, spDevices)
+	devices, err := audio.ListDevices()
 	if err != nil {
 		return err
 	}
@@ -127,8 +112,8 @@ func NewListDevicesCommand() *cli.Command {
 		Usage: "List available audio devices",
 		Description: `List available audio devices for recording and playback.
 
-This command enumerates audio devices using both ffmpeg and system-profiler,
-merges the information, and outputs devices in lexicographical order with their capabilities.`,
+This command enumerates audio devices using system_profiler,
+processes the information, and outputs devices in lexicographical order with their capabilities.`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
 			if err := baseConfig.validate(); err != nil {

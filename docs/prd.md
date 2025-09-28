@@ -69,14 +69,14 @@ The solution succeeds by providing flexibility in how transcribed text is delive
 
 ### 3. Device listing & selection
 
-**FR3.1:** Device listing MUST use support device names used by `ffmpeg`
+**FR3.1:** Device listing MUST use device names compatible with `sox` (via `system_profiler`)
 **FR3.2:** Device selection SHOULD use system defaults when available
 **FR3.3:** Device listing MAY provide additional information such as device type, sample rate, and channel count
 **FR3.4:** Device listing MUST use identifiers that are agnostic across device providers
 
 ### 4. Audio capture
 
-**FR4.1:** Audio capture MUST use `ffmpeg`
+**FR4.1:** Audio capture MUST use `sox`
 **FR4.2:** Audio capture MUST use streaming audio formats (WAV or FLAC)
 **FR4.3:** Audio capture MUST support output to file or stdout
 **FR4.4:** Audio capture MUST support streaming to a transcription service

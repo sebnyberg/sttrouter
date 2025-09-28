@@ -6,11 +6,11 @@ sttrouter is a Go CLI application with BMAD methodology infrastructure for devel
 
 ```
 sttrouter/
-├── audio/                  # Audio device listing implementations
+├── audio/                  # Audio device listing and capture implementations
 │   ├── errors.go          # Sentinel error definitions
-│   ├── ffmpeg.go          # FFmpeg-based device listing
+│   ├── sox.go             # Sox-based audio capture
 │   ├── system_profiler.go # macOS system_profiler-based device listing
-│   ├── ffmpeg_test.go     # Tests for ffmpeg parsing
+│   ├── sox_test.go        # Tests for sox functionality
 │   └── system_profiler_test.go # Tests for system_profiler parsing
 ├── cmd/                     # CLI commands (Cobra)
 │   ├── list_devices.go    # list-devices command implementation
@@ -55,8 +55,8 @@ sttrouter/
 
 ### Audio Package (`audio/`)
 
-- **`ffmpeg.go`** - FFmpeg-based device listing implementation
-  - Parses ffmpeg avfoundation output for audio devices
+- **`sox.go`** - Sox-based audio capture implementation
+  - Uses sox command-line tool for audio capture from devices
 - **`system_profiler.go`** - macOS system_profiler-based device listing implementation
   - Parses system_profiler JSON output for audio devices and defaults
 
@@ -73,7 +73,7 @@ sttrouter/
 
 ## Key Directories
 
-- **`audio/`** - Audio device listing implementations with platform-specific backends
+- **`audio/`** - Audio device listing and capture implementations with platform-specific backends
 - **`cmd/`** - Cobra CLI commands with global configuration
 - **`docs/`** - Living documentation with architecture, PRD, and technical details
 

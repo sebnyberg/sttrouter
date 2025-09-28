@@ -118,14 +118,34 @@ The Nix environment will automatically provide Go, FFmpeg, and golangci-lint in 
 # List available audio devices
 sttrouter list-devices
 
-# Record and transcribe (clipboard output)
-sttrouter transcribe --duration 5s
+# Record audio to file
+sttrouter capture --duration 5s output.wav
 
-# Record and transcribe (stdout output)
-sttrouter transcribe --duration 5s --output stdout
+# Transcribe an audio file
+sttrouter transcribe --api-key YOUR_AZURE_API_KEY --language en recording.flac
 
-# Record and transcribe to file
-sttrouter transcribe --duration 5s --output file --file output.txt
+# Transcribe with specific language
+sttrouter transcribe --api-key YOUR_AZURE_API_KEY --language en recording.flac
+
+# Transcribe with GPT-4o enhancement for better accuracy
+sttrouter transcribe --api-key YOUR_AZURE_API_KEY --language en --enhance recording.flac
+
+# Transcribe to JSON format
+sttrouter transcribe --api-key YOUR_AZURE_API_KEY --language en --response-format json recording.flac
+
+# Use custom query parameters
+sttrouter transcribe --api-key YOUR_AZURE_API_KEY --language en --query-params "api-version=2025-03-01-preview" recording.flac
+```
+
+### Example Script
+
+See `example.sh` for a basic script that transcribes the included sample audio file.
+
+Make sure to set your OpenAI API key before running:
+
+```bash
+export OPENAI_API_KEY="your-api-key-here"
+./example.sh
 ```
 
 ### Build Instructions

@@ -2,6 +2,7 @@ package audio
 
 import (
 	"encoding/json"
+	"sort"
 )
 
 // DeviceFlag represents device capabilities and defaults as bit flags
@@ -50,4 +51,47 @@ func (d *Device) UnmarshalJSON(data []byte) error {
 		d.Mode |= DeviceFlagCurrentOutput
 	}
 	return nil
+}
+
+// ListDevices merges device lists from ffmpeg and system-profiler, validates current devices, and sorts by name.
+func ListDevices(ffmpegDevices, spDevices []Device) ([]Device, error) {
+	// Merge devices from both sources
+	deviceModes := make(map[string]uint)
+	for _, dev := range ffmpegDevices {
+		deviceModes[dev.Name] |= dev.Mode
+	}
+	for _, dev := range spDevices {
+		deviceModes[dev.Name] |= dev.Mode
+	}
+
+	// Check for more than one current device per direction
+	currentInputCount := 0
+	currentOutputCount := 0
+	for _, mode := range deviceModes {
+		if mode&DeviceFlagCurrentInput != 0 {
+			currentInputCount++
+		}
+		if mode&DeviceFlagCurrentOutput != 0 {
+			currentOutputCount++
+		}
+	}
+	if currentInputCount > 1 {
+		return nil, ErrMultipleCurrentDevices
+	}
+	if currentOutputCount > 1 {
+		return nil, ErrMultipleCurrentDevices
+	}
+
+	// Create final device list
+	devices := make([]Device, 0, len(deviceModes))
+	for name, mode := range deviceModes {
+		devices = append(devices, Device{Name: name, Mode: mode})
+	}
+
+	// Sort by name
+	sort.Slice(devices, func(i, j int) bool {
+		return devices[i].Name < devices[j].Name
+	})
+
+	return devices, nil
 }

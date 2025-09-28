@@ -10,3 +10,6 @@ var ErrCommandExecutionFailed = errors.New("command execution failed")
 
 // ErrOutputParsingFailed indicates that parsing the command output failed
 var ErrOutputParsingFailed = errors.New("output parsing failed")
+
+// ErrMultipleCurrentDevices indicates that multiple devices are marked as current for the same direction
+var ErrMultipleCurrentDevices = errors.New("multiple devices marked as current for the same direction")

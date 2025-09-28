@@ -23,11 +23,18 @@ type CaptureConfig struct {
 	Device string `name:"device" usage:"Audio device name (defaults to system default)"`
 	// SampleRate specifies the sample rate in Hz (overrides device default)
 	SampleRate string `name:"rate" usage:"Sample rate in Hz (overrides device default)"`
+	// EnableSilence enables silence-based auto-stop
+	EnableSilence bool `name:"silence" usage:"Enable silence-based auto-stop"`
+	// SilenceThreshold specifies the silence detection threshold (0.0-1.0)
+	SilenceThreshold float64 `name:"silence-threshold" value:"0.01" usage:"Silence detection threshold (0.0-1.0)"`
+	// SilenceMinDuration specifies the minimum silence duration to trigger stop (e.g., "1s")
+	SilenceMinDuration string `name:"silence-min-duration" value:"1s" usage:"Minimum silence duration to trigger stop"`
 }
 
 // runCapture executes the audio capture logic.
 func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, duration time.Duration) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
@@ -67,11 +74,21 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		selectedDevice.SampleRate = rate
 	}
 
+	// Parse silence min duration if silence is enabled
+	var minSilenceDuration time.Duration
+	if config.EnableSilence {
+		minSilenceDuration, err = time.ParseDuration(config.SilenceMinDuration)
+		if err != nil {
+			return fmt.Errorf("invalid silence min duration: %w", err)
+		}
+	}
+
 	// Print individual fields to avoid JSON serialization issues
 	slog.Info("Starting audio capture",
 		"device_name", selectedDevice.Name,
 		"duration", duration,
-		"output", outputFile)
+		"output", outputFile,
+		"silence_enabled", config.EnableSilence)
 
 	// Set up capture I/O
 	g := new(errgroup.Group)
@@ -91,19 +108,49 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		}
 		writer = file
 	}
-	g.Go(func() error {
-		err := sox.ConvertAudio(ctx, logger, captureReader, writer, "raw", "flac", selectedDevice.SampleRate, 2, 16)
-		if err != nil {
+
+	captureCtx, captureCancel := context.WithCancel(ctx)
+	defer captureCancel()
+	if config.EnableSilence {
+		// Set up silence splitter
+		silenceReader, silenceWriter := io.Pipe()
+		splitter := audio.NewSilenceSplitter(ctx, 2, 16, config.SilenceThreshold, minSilenceDuration, selectedDevice.SampleRate, func(data []byte) {
+			_, _ = silenceWriter.Write(data)
+			captureCancel()
+		})
+
+		g.Go(func() error {
+			err := sox.ConvertAudio(ctx, logger, silenceReader, writer, "raw", "flac", selectedDevice.SampleRate, 2, 16)
+			if err != nil {
+				return err
+			}
+			if file != nil {
+				return file.Close()
+			}
+			return nil
+		})
+
+		g.Go(func() error {
+			defer func() { _ = silenceWriter.Close() }()
+			_, err := io.Copy(splitter, captureReader)
+			splitter.Flush() // Flush any remaining data
 			return err
-		}
-		if file != nil {
-			return file.Close()
-		}
-		return nil
-	})
+		})
+	} else {
+		g.Go(func() error {
+			err := sox.ConvertAudio(ctx, logger, captureReader, writer, "raw", "flac", selectedDevice.SampleRate, 2, 16)
+			if err != nil {
+				return err
+			}
+			if file != nil {
+				return file.Close()
+			}
+			return nil
+		})
+	}
 
 	// Capture audio until duration is finished.
-	err = selectedDevice.CaptureAudio(sox, ctx, logger, duration, captureWriter)
+	err = selectedDevice.CaptureAudio(sox, captureCtx, logger, duration, captureWriter)
 	_ = captureWriter.Close()
 	if err != nil {
 		slog.Error("Audio capture failed", "error", err, "device", selectedDevice)

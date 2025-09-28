@@ -5,6 +5,7 @@
 Current coding workflows require frequent context switching between spoken thoughts and manual typing, creating friction in the development process. When dictating comments, documentation, commit messages, or capturing ideas while coding, the need to physically type interrupts the flow of thought and slows down productivity. Existing speech-to-text solutions either require switching to different applications, don't integrate well with development environments, or lack the accuracy needed for technical content. This creates a gap where valuable spoken insights are either lost, poorly captured, or require disruptive workflow changes to record effectively.
 
 The problem is particularly acute during:
+
 - Code review sessions where spoken observations need to be documented
 - Writing technical documentation or comments while in flow state
 - Capturing quick notes or TODO items without breaking coding concentration

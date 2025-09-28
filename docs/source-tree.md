@@ -46,9 +46,9 @@ sttrouter/
 ### CLI Command Layer (`cmd/`)
 
 - **`root.go`** - Root Cobra command with global configuration and platform detection
-  - Defines global flags: `--verbose`, `--device-source`
-  - Platform-aware default device source selection
-  - Command description and help text
+   - Defines global flags: `--verbose`
+   - Platform-aware default device source selection
+   - Command description and help text
 - **`list_devices.go`** - Implementation of the list-devices command
   - Uses dependency injection for device listers
   - Outputs device names with default indication

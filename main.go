@@ -1,7 +1,12 @@
 package main
 
-import "github.com/sebnyberg/sttrouter/cmd"
+import (
+	"github.com/sebnyberg/sttrouter/cmd"
+	"log"
+)
 
 func main() {
-	cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		log.Fatal(err)
+	}
 }

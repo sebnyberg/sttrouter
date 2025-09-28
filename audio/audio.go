@@ -6,11 +6,17 @@ import "sort"
 func ListDevices(ffmpegDevices, spDevices []Device) ([]Device, error) {
 	// Merge devices from both sources
 	deviceModes := make(map[string]uint)
+	deviceSampleRates := make(map[string]int)
+	deviceIndices := make(map[string]string)
+
 	for _, dev := range ffmpegDevices {
 		deviceModes[dev.Name] |= dev.Mode
+		deviceIndices[dev.Name] = dev.Index // Store the ffmpeg device index
 	}
+
 	for _, dev := range spDevices {
 		deviceModes[dev.Name] |= dev.Mode
+		deviceSampleRates[dev.Name] = dev.SampleRate // Safe: ffmpeg devices have no sample rate info, only spDevices provide it
 	}
 
 	// Check for more than one current device per direction
@@ -34,7 +40,12 @@ func ListDevices(ffmpegDevices, spDevices []Device) ([]Device, error) {
 	// Create final device list
 	devices := make([]Device, 0, len(deviceModes))
 	for name, mode := range deviceModes {
-		devices = append(devices, Device{Name: name, Mode: mode})
+		devices = append(devices, Device{
+			Name:       name,
+			Mode:       mode,
+			SampleRate: deviceSampleRates[name], // Safe: deviceSampleRates[name] set from spDevices (non-zero) or 0 for ffmpeg-only devices
+			Index:      deviceIndices[name],     // Include the ffmpeg device index
+		})
 	}
 
 	// Sort by name
@@ -97,6 +108,20 @@ func GetDefaultSource(ffmpegDevices, spDevices []Device) (Device, error) {
 	}
 	for _, dev := range devices {
 		if dev.Mode&DeviceFlagCurrentSource != 0 {
+			return dev, nil
+		}
+	}
+	return Device{}, ErrNoDefaultDevice
+}
+
+// GetDevice returns the device with the specified name
+func GetDevice(name string, ffmpegDevices, spDevices []Device) (Device, error) {
+	devices, err := ListDevices(ffmpegDevices, spDevices)
+	if err != nil {
+		return Device{}, err
+	}
+	for _, dev := range devices {
+		if dev.Name == name {
 			return dev, nil
 		}
 	}

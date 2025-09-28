@@ -130,6 +130,15 @@ sttrouter transcribe --capture --api-key YOUR_AZURE_API_KEY
 # Transcribe with specific language
 sttrouter transcribe --api-key YOUR_AZURE_API_KEY recording.flac
 
+# Transcribe and copy to clipboard
+sttrouter transcribe --api-key YOUR_AZURE_API_KEY --clipboard recording.flac
+
+# Transcribe with JSON output
+sttrouter transcribe --api-key YOUR_AZURE_API_KEY --output-format json recording.flac
+
+# Transcribe with no output (silent)
+sttrouter transcribe --api-key YOUR_AZURE_API_KEY --output-format none recording.flac
+
 # Transcribe from stdin
 sttrouter transcribe --api-key YOUR_AZURE_API_KEY -
 

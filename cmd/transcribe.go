@@ -12,6 +12,7 @@ import (
 
 	"github.com/sebnyberg/flagtags"
 	"github.com/sebnyberg/sttrouter/audio"
+	"github.com/sebnyberg/sttrouter/clipboard"
 	"github.com/sebnyberg/sttrouter/openaix"
 	"github.com/urfave/cli/v2"
 )
@@ -50,12 +51,22 @@ type TranscribeConfig struct {
 	CaptureSilenceThreshold float64 `name:"silence-threshold" value:"0.01" usage:"Silence detection threshold (0.0-1.0)"`
 	// SilenceMinDuration specifies the minimum silence duration to trigger stop (e.g., "1s")
 	CaptureSilenceMinDuration string `name:"silence-min-duration" value:"1s" usage:"Min silence duration to stop"`
+	// Clipboard enables copying transcription result to clipboard
+	Clipboard bool `name:"clipboard" usage:"Copy transcription result to clipboard"`
+	// OutputFormat specifies the output format (none, text, json)
+	OutputFormat string `name:"output-format" value:"text" usage:"Output format (none, text, json)"`
 }
 
 // validate validates the TranscribeConfig and returns an error if required fields are missing.
 func (c *TranscribeConfig) validate() error {
 	if c.APIKey == "" {
 		return fmt.Errorf("API key is required (use --api-key or set API_KEY environment variable)")
+	}
+	switch c.OutputFormat {
+	case "none", "text", "json":
+		// Valid output formats
+	default:
+		return fmt.Errorf("invalid output format: %s (valid values: none, text, json)", c.OutputFormat)
 	}
 	return nil
 }
@@ -197,7 +208,39 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig, audioReader io.
 	}
 
 	transcription := t.Text
-	fmt.Println(transcription)
+
+	// Handle output based on format
+	switch config.OutputFormat {
+	case "none":
+		// No output
+	case "text":
+		if config.Clipboard {
+			reader := bytes.NewReader([]byte(transcription))
+			if err := clipboard.CopyToClipboard(ctx, logger, reader); err != nil {
+				return fmt.Errorf("failed to copy to clipboard: %w", err)
+			}
+			if baseConfig.Verbose {
+				slog.Debug("Transcription copied to clipboard")
+			}
+		} else {
+			// Print to stdout by default
+			fmt.Println(transcription)
+		}
+	case "json":
+		// Output full JSON response
+		jsonOutput := fmt.Sprintf(`{"text": %q}`, transcription)
+		if config.Clipboard {
+			reader := bytes.NewReader([]byte(jsonOutput))
+			if err := clipboard.CopyToClipboard(ctx, logger, reader); err != nil {
+				return fmt.Errorf("failed to copy to clipboard: %w", err)
+			}
+			if baseConfig.Verbose {
+				slog.Debug("Transcription JSON copied to clipboard")
+			}
+		} else {
+			fmt.Println(jsonOutput)
+		}
+	}
 
 	if baseConfig.Verbose {
 		slog.Debug("Transcription completed successfully")
@@ -224,7 +267,12 @@ Otherwise, an AUDIO_FILE argument specifies the audio file to transcribe.
 Use "-" to read audio data from stdin when not using --capture.
 Supported formats include FLAC, MP3, MP4, MPEG, MPGA, M4A, OGG, WAV, and WEBM.
 
-The transcribed text is output to stdout by default.
+Output format can be controlled with --output-format:
+- text: Plain text output (default)
+- json: JSON formatted output
+- none: No output
+
+Use --clipboard to copy results to clipboard instead of stdout.
 
 Examples:
   # Capture and transcribe from microphone
@@ -233,10 +281,19 @@ Examples:
   # Transcribe a FLAC file
   sttrouter transcribe --api-key YOUR_KEY recording.flac
 
+  # Transcribe and copy to clipboard
+  sttrouter transcribe --api-key YOUR_KEY --clipboard recording.flac
+
+  # Transcribe with JSON output
+  sttrouter transcribe --api-key YOUR_KEY --output-format json recording.flac
+
+  # Transcribe with no output (silent)
+  sttrouter transcribe --api-key YOUR_KEY --output-format none recording.flac
+
   # Transcribe from stdin
   sttrouter transcribe --api-key YOUR_KEY -
 
-  # Transcribe to JSON format
+  # Transcribe to JSON format (legacy flag still works)
   sttrouter transcribe --api-key YOUR_KEY --response-format json recording.flac`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {

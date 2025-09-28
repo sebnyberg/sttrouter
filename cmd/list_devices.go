@@ -33,15 +33,15 @@ func (r *listDevicesResult) ToJSON() ([]byte, error) {
 func (r *listDevicesResult) ToTable() string {
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
-	if _, err := fmt.Fprintln(w, "DEVICE_NAME\tINPUT\tOUTPUT\tCURRENT_INPUT\tCURRENT_OUTPUT"); err != nil {
+	if _, err := fmt.Fprintln(w, "DEVICE_NAME\tSOURCE\tSINK\tCURRENT_SOURCE\tCURRENT_SINK"); err != nil {
 		return ""
 	}
 	for _, dev := range r.Devices {
-		isInput := dev.Mode&audio.DeviceFlagInput != 0
-		isOutput := dev.Mode&audio.DeviceFlagOutput != 0
-		isCurrentInput := dev.Mode&audio.DeviceFlagCurrentInput != 0
-		isCurrentOutput := dev.Mode&audio.DeviceFlagCurrentOutput != 0
-		if _, err := fmt.Fprintf(w, "%s\t%t\t%t\t%t\t%t\n", dev.Name, isInput, isOutput, isCurrentInput, isCurrentOutput); err != nil {
+		isSource := dev.Mode&audio.DeviceFlagSource != 0
+		isSink := dev.Mode&audio.DeviceFlagSink != 0
+		isCurrentSource := dev.Mode&audio.DeviceFlagCurrentSource != 0
+		isCurrentSink := dev.Mode&audio.DeviceFlagCurrentSink != 0
+		if _, err := fmt.Fprintf(w, "%s\t%t\t%t\t%t\t%t\n", dev.Name, isSource, isSink, isCurrentSource, isCurrentSink); err != nil {
 			return ""
 		}
 	}
@@ -54,13 +54,13 @@ func (r *listDevicesResult) ToTable() string {
 // ToCSV returns the result as CSV string
 func (r *listDevicesResult) ToCSV() string {
 	var buf bytes.Buffer
-	fmt.Fprintln(&buf, "DEVICE_NAME,INPUT,OUTPUT,CURRENT_INPUT,CURRENT_OUTPUT")
+	fmt.Fprintln(&buf, "DEVICE_NAME,SOURCE,SINK,CURRENT_SOURCE,CURRENT_SINK")
 	for _, dev := range r.Devices {
-		isInput := dev.Mode&audio.DeviceFlagInput != 0
-		isOutput := dev.Mode&audio.DeviceFlagOutput != 0
-		isCurrentInput := dev.Mode&audio.DeviceFlagCurrentInput != 0
-		isCurrentOutput := dev.Mode&audio.DeviceFlagCurrentOutput != 0
-		fmt.Fprintf(&buf, "%s,%t,%t,%t,%t\n", dev.Name, isInput, isOutput, isCurrentInput, isCurrentOutput)
+		isSource := dev.Mode&audio.DeviceFlagSource != 0
+		isSink := dev.Mode&audio.DeviceFlagSink != 0
+		isCurrentSource := dev.Mode&audio.DeviceFlagCurrentSource != 0
+		isCurrentSink := dev.Mode&audio.DeviceFlagCurrentSink != 0
+		fmt.Fprintf(&buf, "%s,%t,%t,%t,%t\n", dev.Name, isSource, isSink, isCurrentSource, isCurrentSink)
 	}
 	return buf.String()
 }

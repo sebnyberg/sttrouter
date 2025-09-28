@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // Sox handles audio capture using sox
@@ -18,24 +19,20 @@ func NewSox(ctx context.Context) (*Sox, error) {
 }
 
 // CaptureAudio captures audio from the specified device to the output file or stdout
-func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device, duration, container, output string) error {
+func (s *Sox) CaptureAudio(ctx context.Context, log *slog.Logger, device Device, duration time.Duration, targetFormat, output string) error {
 	args := []string{"-t", "coreaudio", device.Name}
-
-	if container != "" {
-		args = append(args, "-t", container)
-	} else {
-		args = append(args, "-t", "wav") // default to wav
-	}
 
 	// Set sample rate if provided
 	if device.SampleRate > 0 {
 		args = append(args, "-r", fmt.Sprintf("%d", device.SampleRate))
 	}
 
+	args = append(args, "-t", targetFormat)
+
 	args = append(args, output)
 
-	if duration != "" {
-		args = append(args, "trim", "0", "10")
+	if duration > 0 {
+		args = append(args, "trim", "0", fmt.Sprintf("%.1f", duration.Seconds()))
 	}
 
 	log.InfoContext(ctx, "Running sox",

@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
-	"sort"
 	"text/tabwriter"
 
 	"github.com/sebnyberg/flagtags"
@@ -13,16 +13,65 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// ListDevicesResult represents the result of the list-devices command
-type ListDevicesResult struct {
+// ListDevicesConfig holds list-devices specific configuration flags.
+type ListDevicesConfig struct {
+	// OutputFormat specifies the output format for the device list
+	OutputFormat string `name:"o" env:"OUTPUT_FORMAT" value:"json" usage:"Output format (json, table, csv)"`
+}
+
+// listDevicesResult is used for output formatting
+type listDevicesResult struct {
 	Devices []audio.Device `json:"devices"`
 }
 
+// ToJSON returns the result as JSON bytes
+func (r *listDevicesResult) ToJSON() ([]byte, error) {
+	return json.MarshalIndent(r, "", "  ")
+}
+
+// ToTable returns the result as a table string
+func (r *listDevicesResult) ToTable() string {
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
+	fmt.Fprintln(w, "DEVICE_NAME\tINPUT\tOUTPUT\tDEFAULT")
+	for _, dev := range r.Devices {
+		isInput := dev.Mode&audio.DeviceFlagInput != 0
+		isOutput := dev.Mode&audio.DeviceFlagOutput != 0
+		isDefault := dev.Mode&audio.DeviceFlagIsDefault != 0
+		fmt.Fprintf(w, "%s\t%t\t%t\t%t\n", dev.Name, isInput, isOutput, isDefault)
+	}
+	w.Flush()
+	return buf.String()
+}
+
+// ToCSV returns the result as CSV string
+func (r *listDevicesResult) ToCSV() string {
+	var buf bytes.Buffer
+	fmt.Fprintln(&buf, "DEVICE_NAME,INPUT,OUTPUT,DEFAULT")
+	for _, dev := range r.Devices {
+		isInput := dev.Mode&audio.DeviceFlagInput != 0
+		isOutput := dev.Mode&audio.DeviceFlagOutput != 0
+		isDefault := dev.Mode&audio.DeviceFlagIsDefault != 0
+		fmt.Fprintf(&buf, "%s,%t,%t,%t\n", dev.Name, isInput, isOutput, isDefault)
+	}
+	return buf.String()
+}
+
+// validate validates the list-devices configuration.
+func (c *ListDevicesConfig) validate() error {
+	switch c.OutputFormat {
+	case textOutputFormatJSON, textOutputFormatTable, textOutputFormatCSV:
+		return nil
+	default:
+		return fmt.Errorf("invalid output format: %s (valid values: %s, %s, %s)", c.OutputFormat, textOutputFormatJSON, textOutputFormatTable, textOutputFormatCSV)
+	}
+}
+
 // runListDevices executes the device listing logic.
-func runListDevices(config *Config) error {
+func runListDevices(baseConfig *Config, config *ListDevicesConfig) error {
 	ctx := context.Background()
 
-	logger := config.getLogger()
+	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
 
 	ffmpeg, err := audio.NewFFmpeg(ctx)
@@ -37,68 +86,33 @@ func runListDevices(config *Config) error {
 
 	ffmpegDevices := ffmpeg.ListDevices()
 	spDevices := sp.ListDevices()
-
-	// Merge devices from both sources
-	deviceModes := make(map[string]uint)
-	for _, dev := range ffmpegDevices {
-		deviceModes[dev.Name] |= dev.Mode
-	}
-	for _, dev := range spDevices {
-		deviceModes[dev.Name] |= dev.Mode
+	devices, err := audio.GetDevices(ffmpegDevices, spDevices)
+	if err != nil {
+		return err
 	}
 
-	// Check for more than one default device
-	defaultCount := 0
-	for _, mode := range deviceModes {
-		if mode&audio.DeviceFlagIsDefault != 0 {
-			defaultCount++
-		}
-	}
-	if defaultCount > 1 {
-		return fmt.Errorf("more than one default device found")
+	result := &listDevicesResult{Devices: devices}
+
+	output, err := formatOutput(config.OutputFormat, result)
+	if err != nil {
+		return err
 	}
 
-	// Create final device list
-	var devices []audio.Device
-	for name, mode := range deviceModes {
-		devices = append(devices, audio.Device{Name: name, Mode: mode})
-	}
-
-	// Sort by name
-	sort.Slice(devices, func(i, j int) bool {
-		return devices[i].Name < devices[j].Name
-	})
-
-	if config.Verbose {
+	if baseConfig.Verbose {
 		fmt.Printf("Found %d devices\n", len(devices))
 	}
 
-	// Output using tabwriter for aligned columns
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	if _, err := fmt.Fprintln(w, "DEVICE_NAME|INPUT|OUTPUT|DEFAULT"); err != nil {
-		return err
-	}
-
-	// Output devices
-	for _, dev := range devices {
-		isInput := dev.Mode&audio.DeviceFlagInput != 0
-		isOutput := dev.Mode&audio.DeviceFlagOutput != 0
-		isDefault := dev.Mode&audio.DeviceFlagIsDefault != 0
-		if _, err := fmt.Fprintf(w, "%s|%t|%t|%t\n", dev.Name, isInput, isOutput, isDefault); err != nil {
-			return err
-		}
-	}
-
-	if err := w.Flush(); err != nil {
-		return err
-	}
+	fmt.Print(output)
 
 	return nil
 }
 
 func NewListDevicesCommand() *cli.Command {
-	var config Config
-	flags := flagtags.MustParseFlags(&config)
+	var baseConfig Config
+	var listDevicesConfig ListDevicesConfig
+	baseFlags := flagtags.MustParseFlags(&baseConfig)
+	listDevicesFlags := flagtags.MustParseFlags(&listDevicesConfig)
+	flags := append(baseFlags, listDevicesFlags...)
 
 	return &cli.Command{
 		Name:  "list-devices",
@@ -109,10 +123,13 @@ This command enumerates audio devices using both ffmpeg and system-profiler,
 merges the information, and outputs devices in lexicographical order with their capabilities.`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
-			if err := config.validate(); err != nil {
+			if err := baseConfig.validate(); err != nil {
 				return err
 			}
-			return runListDevices(&config)
+			if err := listDevicesConfig.validate(); err != nil {
+				return err
+			}
+			return runListDevices(&baseConfig, &listDevicesConfig)
 		},
 	}
 }

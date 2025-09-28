@@ -94,7 +94,7 @@ func runListDevices(baseConfig *Config, config *ListDevicesConfig) error {
 
 	ffmpegDevices := ffmpeg.ListDevices()
 	spDevices := sp.ListDevices()
-	devices, err := audio.GetDevices(ffmpegDevices, spDevices)
+	devices, err := audio.ListDevices(ffmpegDevices, spDevices)
 	if err != nil {
 		return err
 	}

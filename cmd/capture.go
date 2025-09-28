@@ -43,6 +43,11 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		return fmt.Errorf("failed to initialize system profiler: %w", err)
 	}
 
+	sox, err := audio.NewSox(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize sox: %w", err)
+	}
+
 	spDevices := sp.ListDevices()
 
 	// Resolve device
@@ -100,10 +105,15 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		defer func() { _ = file.Close() }()
 	}
 
-	err = audio.CaptureAndConvert(ctx, logger, selectedDevice, config.EnableSilence, config.SilenceThreshold, minSilenceDuration, writer, duration)
+	reader, err := audio.LimitedCapture(ctx, logger, selectedDevice, config.EnableSilence, config.SilenceThreshold, minSilenceDuration, duration)
 	if err != nil {
 		slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
 		return fmt.Errorf("audio capture failed: %w", err)
+	}
+
+	err = sox.ConvertAudio(ctx, logger, reader, writer, "raw", "flac", selectedDevice.SampleRate, 2, 16)
+	if err != nil {
+		return fmt.Errorf("audio conversion failed: %w", err)
 	}
 
 	if baseConfig.Verbose {

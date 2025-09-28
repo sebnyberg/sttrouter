@@ -9,12 +9,11 @@ import (
 
 // SystemProfiler handles device listing using macOS system_profiler
 type SystemProfiler struct {
-	devices       []Device
-	defaultDevice string
+	devices []Device
 }
 
 // parseSystemProfilerDevices parses system_profiler JSON output
-func parseSystemProfilerDevices(output []byte) ([]Device, string, error) {
+func parseSystemProfilerDevices(output []byte) ([]Device, error) {
 	var data struct {
 		SPAudioDataType []struct {
 			Items []struct {
@@ -28,11 +27,10 @@ func parseSystemProfilerDevices(output []byte) ([]Device, string, error) {
 	}
 
 	if err := json.Unmarshal(output, &data); err != nil {
-		return nil, "", fmt.Errorf("parsing: %w", ErrOutputParsingFailed)
+		return nil, fmt.Errorf("parsing: %w", ErrOutputParsingFailed)
 	}
 
 	var devices []Device
-	var defaultDevice string
 	for _, audioType := range data.SPAudioDataType {
 		for _, item := range audioType.Items {
 			mode := uint(0)
@@ -43,14 +41,16 @@ func parseSystemProfilerDevices(output []byte) ([]Device, string, error) {
 				mode |= DeviceFlagOutput
 			}
 			if item.DefaultInputDevice == "spaudio_yes" {
-				mode |= DeviceFlagIsDefault
-				defaultDevice = item.Name
+				mode |= DeviceFlagCurrentInput
+			}
+			if item.DefaultOutputDevice == "spaudio_yes" {
+				mode |= DeviceFlagCurrentOutput
 			}
 			devices = append(devices, Device{Name: item.Name, Mode: mode})
 		}
 	}
 
-	return devices, defaultDevice, nil
+	return devices, nil
 }
 
 // NewSystemProfiler creates a new SystemProfiler by running system_profiler
@@ -61,12 +61,12 @@ func NewSystemProfiler(ctx context.Context) (*SystemProfiler, error) {
 		return nil, fmt.Errorf("system_profiler: %w", ErrCommandExecutionFailed)
 	}
 
-	devices, defaultDevice, err := parseSystemProfilerDevices(output)
+	devices, err := parseSystemProfilerDevices(output)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SystemProfiler{devices: devices, defaultDevice: defaultDevice}, nil
+	return &SystemProfiler{devices: devices}, nil
 }
 
 // ListDevices returns the list of devices
@@ -74,7 +74,12 @@ func (s *SystemProfiler) ListDevices() []Device {
 	return s.devices
 }
 
-// GetDefaultDeviceName returns the name of the default input device
+// GetDefaultDeviceName returns the name of the current input device
 func (s *SystemProfiler) GetDefaultDeviceName() string {
-	return s.defaultDevice
+	for _, device := range s.devices {
+		if device.Mode&DeviceFlagCurrentInput != 0 {
+			return device.Name
+		}
+	}
+	return ""
 }

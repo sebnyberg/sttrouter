@@ -2,16 +2,16 @@ package audio
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
 )
 
 // DeviceFlag represents device capabilities and defaults as bit flags
 const (
-	DeviceFlagUnset     = 0
-	DeviceFlagInput     = 1 << 0
-	DeviceFlagOutput    = 1 << 1
-	DeviceFlagIsDefault = 1 << 2
+	DeviceFlagUnset         = 0
+	DeviceFlagInput         = 1 << 0
+	DeviceFlagOutput        = 1 << 1
+	DeviceFlagCurrentInput  = 1 << 2
+	DeviceFlagCurrentOutput = 1 << 3
 )
 
 // Device represents an audio device with its name and mode flags
@@ -23,10 +23,11 @@ type Device struct {
 // MarshalJSON custom marshals Device to JSON with readable flags
 func (d Device) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
-		"name":    d.Name,
-		"input":   d.Mode&DeviceFlagInput != 0,
-		"output":  d.Mode&DeviceFlagOutput != 0,
-		"default": d.Mode&DeviceFlagIsDefault != 0,
+		"name":           d.Name,
+		"input":          d.Mode&DeviceFlagInput != 0,
+		"output":         d.Mode&DeviceFlagOutput != 0,
+		"current_input":  d.Mode&DeviceFlagCurrentInput != 0,
+		"current_output": d.Mode&DeviceFlagCurrentOutput != 0,
 	})
 }
 
@@ -43,13 +44,16 @@ func (d *Device) UnmarshalJSON(data []byte) error {
 	if output, ok := m["output"].(bool); ok && output {
 		d.Mode |= DeviceFlagOutput
 	}
-	if def, ok := m["default"].(bool); ok && def {
-		d.Mode |= DeviceFlagIsDefault
+	if currentInput, ok := m["current_input"].(bool); ok && currentInput {
+		d.Mode |= DeviceFlagCurrentInput
+	}
+	if currentOutput, ok := m["current_output"].(bool); ok && currentOutput {
+		d.Mode |= DeviceFlagCurrentOutput
 	}
 	return nil
 }
 
-// GetDevices merges device lists from ffmpeg and system-profiler, validates defaults, and sorts by name.
+// GetDevices merges device lists from ffmpeg and system-profiler and sorts by name.
 func GetDevices(ffmpegDevices, spDevices []Device) ([]Device, error) {
 	// Merge devices from both sources
 	deviceModes := make(map[string]uint)
@@ -58,17 +62,6 @@ func GetDevices(ffmpegDevices, spDevices []Device) ([]Device, error) {
 	}
 	for _, dev := range spDevices {
 		deviceModes[dev.Name] |= dev.Mode
-	}
-
-	// Check for more than one default device
-	defaultCount := 0
-	for _, mode := range deviceModes {
-		if mode&DeviceFlagIsDefault != 0 {
-			defaultCount++
-		}
-	}
-	if defaultCount > 1 {
-		return nil, fmt.Errorf("more than one default device found")
 	}
 
 	// Create final device list

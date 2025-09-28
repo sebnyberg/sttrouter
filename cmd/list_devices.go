@@ -33,26 +33,34 @@ func (r *listDevicesResult) ToJSON() ([]byte, error) {
 func (r *listDevicesResult) ToTable() string {
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "DEVICE_NAME\tINPUT\tOUTPUT\tDEFAULT")
+	if _, err := fmt.Fprintln(w, "DEVICE_NAME\tINPUT\tOUTPUT\tCURRENT_INPUT\tCURRENT_OUTPUT"); err != nil {
+		return ""
+	}
 	for _, dev := range r.Devices {
 		isInput := dev.Mode&audio.DeviceFlagInput != 0
 		isOutput := dev.Mode&audio.DeviceFlagOutput != 0
-		isDefault := dev.Mode&audio.DeviceFlagIsDefault != 0
-		fmt.Fprintf(w, "%s\t%t\t%t\t%t\n", dev.Name, isInput, isOutput, isDefault)
+		isCurrentInput := dev.Mode&audio.DeviceFlagCurrentInput != 0
+		isCurrentOutput := dev.Mode&audio.DeviceFlagCurrentOutput != 0
+		if _, err := fmt.Fprintf(w, "%s\t%t\t%t\t%t\t%t\n", dev.Name, isInput, isOutput, isCurrentInput, isCurrentOutput); err != nil {
+			return ""
+		}
 	}
-	w.Flush()
+	if err := w.Flush(); err != nil {
+		return ""
+	}
 	return buf.String()
 }
 
 // ToCSV returns the result as CSV string
 func (r *listDevicesResult) ToCSV() string {
 	var buf bytes.Buffer
-	fmt.Fprintln(&buf, "DEVICE_NAME,INPUT,OUTPUT,DEFAULT")
+	fmt.Fprintln(&buf, "DEVICE_NAME,INPUT,OUTPUT,CURRENT_INPUT,CURRENT_OUTPUT")
 	for _, dev := range r.Devices {
 		isInput := dev.Mode&audio.DeviceFlagInput != 0
 		isOutput := dev.Mode&audio.DeviceFlagOutput != 0
-		isDefault := dev.Mode&audio.DeviceFlagIsDefault != 0
-		fmt.Fprintf(&buf, "%s,%t,%t,%t\n", dev.Name, isInput, isOutput, isDefault)
+		isCurrentInput := dev.Mode&audio.DeviceFlagCurrentInput != 0
+		isCurrentOutput := dev.Mode&audio.DeviceFlagCurrentOutput != 0
+		fmt.Fprintf(&buf, "%s,%t,%t,%t,%t\n", dev.Name, isInput, isOutput, isCurrentInput, isCurrentOutput)
 	}
 	return buf.String()
 }

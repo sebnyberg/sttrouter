@@ -10,6 +10,7 @@ require (
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	golang.org/x/sync v0.17.0
 )
 
 replace github.com/sebnyberg/flagtags => github.com/sebnyberg/flagtags v0.0.0-20250928093014-673757aef6ba

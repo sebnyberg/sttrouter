@@ -3,18 +3,23 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"slices"
 	"sort"
 	"text/tabwriter"
 
+	"github.com/sebnyberg/flagtags"
 	"github.com/sebnyberg/sttrouter/audio"
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v2"
 )
 
 // runListDevices executes the device listing logic.
 func runListDevices(config *Config) error {
 	ctx := context.Background()
+
+	logger := config.getLogger()
+	slog.SetDefault(logger)
 
 	ffmpeg, err := audio.NewFFmpeg(ctx)
 	if err != nil {
@@ -65,20 +70,23 @@ func runListDevices(config *Config) error {
 	return nil
 }
 
-// listDevicesCmd represents the list-devices command
-var listDevicesCmd = &cobra.Command{
-	Use:   "list-devices",
-	Short: "List available audio devices",
-	Long: `List available audio input devices for recording.
+func NewListDevicesCommand() *cli.Command {
+	var config Config
+	flags := flagtags.MustParseFlags(&config)
+
+	return &cli.Command{
+		Name:  "list-devices",
+		Usage: "List available audio input devices",
+		Description: `List available audio input devices for recording.
 
 This command enumerates audio devices using both ffmpeg and system-profiler,
 verifies they match, and outputs devices in lexicographical order with default marked.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		config := getConfigFromContext(cmd.Context())
-		return runListDevices(config)
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(listDevicesCmd)
+		Flags: flags,
+		Action: func(c *cli.Context) error {
+			if err := config.validate(); err != nil {
+				return err
+			}
+			return runListDevices(&config)
+		},
+	}
 }

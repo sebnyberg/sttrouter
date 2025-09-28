@@ -1,24 +1,31 @@
 package cmd
 
-import "fmt"
+import (
+	"fmt"
+	"log/slog"
+	"os"
+)
+
+// EnvPrefix is the prefix for environment variables
+const EnvPrefix = "STTR"
 
 // Config holds the global application configuration.
 // This structure enables clean separation between CLI parsing and business logic.
 type Config struct {
 	// Log holds logging configuration
-	Log LogConfig `mapstructure:"log"`
+	Log LogConfig `name:"log"`
 
 	// Verbose enables more detailed logging and output
-	Verbose bool `mapstructure:"verbose" default:"false"`
+	Verbose bool `name:"verbose" usage:"Enable verbose output"`
 }
 
 // LogConfig holds logging-related configuration
 type LogConfig struct {
 	// Level defines the minimum log level to output (debug, info, warn, error)
-	Level string `mapstructure:"level" default:"info"`
+	Level string `value:"info" usage:"Set log level (debug, info, warn, error)"`
 
 	// Format specifies the log output format (text, json)
-	Format string `mapstructure:"format" default:"text"`
+	Format string `value:"text" usage:"Set log format (text, json)"`
 }
 
 // validate validates the configuration and sets defaults.
@@ -40,4 +47,35 @@ func (c *Config) validate() error {
 	}
 
 	return nil
+}
+
+// getLogger returns a configured slog.Logger based on the config
+func (c *Config) getLogger() *slog.Logger {
+	// Map string levels to slog levels
+	var level slog.Level
+	switch c.Log.Level {
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo // default fallback
+	}
+
+	// Create handler based on format
+	var handler slog.Handler
+	switch c.Log.Format {
+	case "json":
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+	case "text":
+		fallthrough
+	default:
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+	}
+
+	return slog.New(handler)
 }

@@ -90,13 +90,18 @@ func GetDevice(name string, spDevices []Device) (Device, error) {
 	return Device{}, ErrNoDefaultDevice
 }
 
-// LimitedCapture captures raw audio from the device until silence is detected or duration expires
-func LimitedCapture(ctx context.Context, logger *slog.Logger, device Device, enableSilence bool, silenceThreshold float64, silenceMinDuration time.Duration, duration time.Duration) (io.Reader, error) {
-	sox, err := NewSox(ctx)
-	if err != nil {
-		return nil, err
-	}
+// LimitedCaptureArgs holds the arguments for limited capture
+type LimitedCaptureArgs struct {
+	EnableSilence      bool
+	SilenceThreshold   float64
+	SilenceMinDuration time.Duration
+	Duration           time.Duration
+	Channels           int
+	BitDepth           int
+}
 
+// LimitedCapture captures raw audio from the device until silence is detected or duration expires
+func LimitedCapture(ctx context.Context, logger *slog.Logger, device Device, args LimitedCaptureArgs) (io.Reader, error) {
 	// Buffer to collect raw audio
 	buffer := &bytes.Buffer{}
 
@@ -106,10 +111,10 @@ func LimitedCapture(ctx context.Context, logger *slog.Logger, device Device, ena
 
 	captureCtx, captureCancel := context.WithCancel(ctx)
 	defer captureCancel()
-	if enableSilence {
+	if args.EnableSilence {
 		// Set up silence splitter
 		silenceReader, silenceWriter := io.Pipe()
-		splitter := NewSilenceSplitter(ctx, 2, 16, silenceThreshold, silenceMinDuration, device.SampleRate, func(data []byte) {
+		splitter := NewSilenceSplitter(ctx, args.Channels, args.BitDepth, args.SilenceThreshold, args.SilenceMinDuration, device.SampleRate, func(data []byte) {
 			_, _ = silenceWriter.Write(data)
 			captureCancel()
 		})
@@ -134,7 +139,13 @@ func LimitedCapture(ctx context.Context, logger *slog.Logger, device Device, ena
 	}
 
 	// Capture audio until duration is finished.
-	err = device.CaptureAudio(sox, captureCtx, logger, duration, captureWriter)
+	err := CaptureAudio(captureCtx, logger, CaptureArgs{
+		Device:   device,
+		Duration: args.Duration,
+		Output:   captureWriter,
+		Channels: args.Channels,
+		BitDepth: args.BitDepth,
+	})
 	_ = captureWriter.Close()
 	if err != nil {
 		return nil, err

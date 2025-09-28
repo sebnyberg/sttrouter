@@ -22,6 +22,10 @@ type CaptureConfig struct {
 	Device string `name:"device" usage:"Audio device name (defaults to system default)"`
 	// SampleRate specifies the sample rate in Hz (overrides device default)
 	SampleRate string `name:"rate" usage:"Sample rate in Hz (overrides device default)"`
+	// Channels specifies the number of audio channels
+	Channels int `name:"channels" value:"2" usage:"Number of audio channels"`
+	// BitDepth specifies the audio bit depth
+	BitDepth int `name:"bit-depth" value:"16" usage:"Audio bit depth"`
 	// EnableSilence enables silence-based auto-stop
 	EnableSilence bool `name:"silence" usage:"Enable silence-based auto-stop"`
 	// SilenceThreshold specifies the silence detection threshold (0.0-1.0)
@@ -41,11 +45,6 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 	sp, err := audio.NewSystemProfiler(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize system profiler: %w", err)
-	}
-
-	sox, err := audio.NewSox(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to initialize sox: %w", err)
 	}
 
 	spDevices := sp.ListDevices()
@@ -105,13 +104,20 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		defer func() { _ = file.Close() }()
 	}
 
-	reader, err := audio.LimitedCapture(ctx, logger, selectedDevice, config.EnableSilence, config.SilenceThreshold, minSilenceDuration, duration)
+	reader, err := audio.LimitedCapture(ctx, logger, selectedDevice, audio.LimitedCaptureArgs{
+		EnableSilence:      config.EnableSilence,
+		SilenceThreshold:   config.SilenceThreshold,
+		SilenceMinDuration: minSilenceDuration,
+		Duration:           duration,
+		Channels:           config.Channels,
+		BitDepth:           config.BitDepth,
+	})
 	if err != nil {
 		slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
 		return fmt.Errorf("audio capture failed: %w", err)
 	}
 
-	err = sox.ConvertAudio(ctx, logger, reader, writer, "raw", "flac", selectedDevice.SampleRate, 2, 16)
+	err = audio.ConvertAudio(ctx, logger, reader, writer, "raw", "flac", selectedDevice.SampleRate, config.Channels, config.BitDepth)
 	if err != nil {
 		return fmt.Errorf("audio conversion failed: %w", err)
 	}

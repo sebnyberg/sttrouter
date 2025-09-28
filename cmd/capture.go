@@ -82,7 +82,7 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 	}
 
 	// Print individual fields to avoid JSON serialization issues
-	slog.Info("Starting audio capture",
+	slog.Debug("Starting audio capture",
 		"device_name", selectedDevice.Name,
 		"duration", duration,
 		"output", outputFile,
@@ -131,7 +131,7 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 	}
 
 	if baseConfig.Verbose {
-		slog.Info("Audio capture completed successfully")
+		slog.Debug("Audio capture completed successfully")
 	}
 
 	return nil

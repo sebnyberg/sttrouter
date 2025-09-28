@@ -63,7 +63,11 @@ func (c *Config) getLogger() *slog.Logger {
 	case "error":
 		level = slog.LevelError
 	default:
-		level = slog.LevelInfo // default fallback
+		if c.Verbose {
+			level = slog.LevelDebug // show debug when verbose
+		} else {
+			level = slog.LevelWarn // hide info/debug by default
+		}
 	}
 
 	// Create handler based on format

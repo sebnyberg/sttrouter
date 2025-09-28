@@ -51,7 +51,7 @@ func CaptureAudio(ctx context.Context, log *slog.Logger, args CaptureArgs) (retE
 	// Use "-" to output to stdout when writing to io.Writer
 	cmdArgs = append(cmdArgs, "-")
 
-	log.InfoContext(ctx, "Running sox",
+	log.DebugContext(ctx, "Running sox",
 		"args", cmdArgs,
 		"command", fmt.Sprintf("sox %s", strings.Join(cmdArgs, " ")),
 		"device", args.Device)
@@ -137,7 +137,7 @@ func ConvertAudio(ctx context.Context, log *slog.Logger, args ConvertAudioArgs) 
 	}
 	cmdArgs = append(cmdArgs, "-")
 
-	log.InfoContext(ctx, "Running sox convert",
+	log.DebugContext(ctx, "Running sox convert",
 		"args", cmdArgs,
 		"command", fmt.Sprintf("sox %s", strings.Join(cmdArgs, " ")))
 

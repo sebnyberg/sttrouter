@@ -46,6 +46,8 @@ type TranscribeConfig struct {
 	NoCapture bool `name:"no-capture" usage:"Disable audio capture and use provided file for transcription"`
 	// OutputFormat specifies the output format (none, text)
 	OutputFormat string `name:"output-format" value:"text" usage:"Output format (none, text)"`
+	// Debug enables debug mode, keeping temp files and printing their locations
+	Debug bool `name:"debug" usage:"Enable debug mode (keeps temp files and prints locations)"`
 }
 
 // validate validates the TranscribeConfig and returns an error if required fields are missing.
@@ -175,13 +177,20 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig, inputFile strin
 		if err != nil {
 			return fmt.Errorf("failed to create temp file: %w", err)
 		}
+		if !config.Debug {
+			defer func() { _ = os.Remove(tempFile.Name()) }()
+		}
 		slog.Debug("tempfile created", "path", tempFile.Name())
+		if config.Debug {
+			fmt.Printf("Debug: temp file created at %s\n", tempFile.Name())
+		}
 		fmt.Println("Audio capture started")
 		if err := runCaptureToWriter(baseConfig, config, tempFile); err != nil {
 			return err
 		}
-		if _, err := tempFile.Seek(0, 0); err != nil {
-			return fmt.Errorf("failed to seek tempfile back to the beginning, %w", err)
+		// Flush by closing the file
+		if err := tempFile.Close(); err != nil {
+			return fmt.Errorf("failed to close the temporary audio file, %w", err)
 		}
 		fmt.Println("Audio capture completed")
 		slog.Info("capture completed")

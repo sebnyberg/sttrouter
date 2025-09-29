@@ -22,7 +22,7 @@ type Config struct {
 // LogConfig holds logging-related configuration
 type LogConfig struct {
 	// Level defines the minimum log level to output (debug, info, warn, error)
-	Level string `value:"info" usage:"Set log level (debug, info, warn, error)"`
+	Level string `value:"warn" usage:"Set log level (debug, info, warn, error)"`
 
 	// Format specifies the log output format (text, json)
 	Format string `value:"text" usage:"Set log format (text, json)"`

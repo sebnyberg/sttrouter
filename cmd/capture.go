@@ -16,7 +16,7 @@ import (
 // CaptureConfig holds capture specific configuration flags.
 type CaptureConfig struct {
 	// Duration specifies the capture duration (e.g., "10s", "1m")
-	Duration string `name:"duration" value:"10s" usage:"Capture duration (e.g., 10s, 1m)"`
+	Duration string `name:"duration" value:"0" usage:"Capture duration (e.g., 10s, 1m)"`
 	// Device specifies the audio device name (defaults to system default)
 	Device string `name:"device" usage:"Audio device name (defaults to system default)"`
 	// SampleRate specifies the sample rate in Hz (overrides device default)
@@ -34,8 +34,10 @@ type CaptureConfig struct {
 }
 
 func (c *CaptureConfig) validate() error {
-	if _, err := time.ParseDuration(c.Duration); err != nil {
-		return fmt.Errorf("invalid capture duration '%v', %w", c.Duration, err)
+	if c.Duration != "" {
+		if _, err := time.ParseDuration(c.Duration); err != nil {
+			return fmt.Errorf("invalid capture duration '%v', %w", c.Duration, err)
+		}
 	}
 	if c.SampleRate < 0 {
 		return fmt.Errorf("sample rate must be >= 0, was '%v", c.SampleRate)

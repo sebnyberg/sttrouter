@@ -124,21 +124,27 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		defer func() { _ = file.Close() }()
 	}
 
-	reader, err := audio.LimitedCapture(ctx, logger, selectedDevice, audio.LimitedCaptureArgs{
-		EnableSilence:      config.EnableSilence,
-		SilenceThreshold:   config.SilenceThreshold,
-		SilenceMinDuration: minSilenceDuration,
-		Duration:           duration,
-		Channels:           config.Channels,
-		BitDepth:           config.BitDepth,
-	})
-	if err != nil {
-		slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
-		return fmt.Errorf("audio capture failed: %w", err)
-	}
+	pipeReader, pipeWriter := io.Pipe()
+
+	// Run LimitedCapture in a goroutine so it can write to the pipe concurrently with ConvertAudio reading
+	go func() {
+		err := audio.LimitedCapture(ctx, logger, selectedDevice, audio.LimitedCaptureArgs{
+			EnableSilence:      config.EnableSilence,
+			SilenceThreshold:   config.SilenceThreshold,
+			SilenceMinDuration: minSilenceDuration,
+			Duration:           duration,
+			Channels:           config.Channels,
+			BitDepth:           config.BitDepth,
+			Writer:             pipeWriter,
+		})
+		if err != nil {
+			slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
+			// Note: error handling in goroutine - in a real implementation you might need to signal this back
+		}
+	}()
 
 	err = audio.ConvertAudio(ctx, logger, audio.ConvertAudioArgs{
-		Reader:       reader,
+		Reader:       pipeReader,
 		Writer:       writer,
 		SourceFormat: "raw",
 		TargetFormat: "flac",

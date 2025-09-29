@@ -114,21 +114,27 @@ func runCaptureToWriter(baseConfig *Config, config *TranscribeConfig, resultsWri
 		"duration", duration,
 		"silence_enabled", config.Capture.EnableSilence)
 
-	reader, err := audio.LimitedCapture(ctx, logger, selectedDevice, audio.LimitedCaptureArgs{
-		EnableSilence:      config.Capture.EnableSilence,
-		SilenceThreshold:   config.Capture.SilenceThreshold,
-		SilenceMinDuration: minSilenceDuration,
-		Duration:           duration,
-		Channels:           config.Capture.Channels,
-		BitDepth:           config.Capture.BitDepth,
-	})
-	if err != nil {
-		panic(fmt.Errorf("audio capture failed: %w", err))
-	}
+	pipeReader, pipeWriter := io.Pipe()
+
+	// Run LimitedCapture in a goroutine so it can write to the pipe concurrently with ConvertAudio reading
+	go func() {
+		err = audio.LimitedCapture(ctx, logger, selectedDevice, audio.LimitedCaptureArgs{
+			EnableSilence:      config.Capture.EnableSilence,
+			SilenceThreshold:   config.Capture.SilenceThreshold,
+			SilenceMinDuration: minSilenceDuration,
+			Duration:           duration,
+			Channels:           config.Capture.Channels,
+			BitDepth:           config.Capture.BitDepth,
+			Writer:             pipeWriter,
+		})
+		if err != nil {
+			panic(fmt.Errorf("audio capture failed: %w", err))
+		}
+	}()
 
 	// Convert the raw audio to FLAC format and write directly to temp file
 	err = audio.ConvertAudio(ctx, logger, audio.ConvertAudioArgs{
-		Reader:       reader,
+		Reader:       pipeReader,
 		Writer:       resultsWriter,
 		SourceFormat: "raw",
 		TargetFormat: "flac",

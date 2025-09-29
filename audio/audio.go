@@ -1,7 +1,6 @@
 package audio
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -98,6 +97,7 @@ type LimitedCaptureArgs struct {
 	Duration           time.Duration
 	Channels           int
 	BitDepth           int
+	Writer             io.WriteCloser
 }
 
 // LimitedCapture captures raw audio from the device until silence is detected or duration expires
@@ -106,9 +106,8 @@ func LimitedCapture(
 	logger *slog.Logger,
 	device Device,
 	args LimitedCaptureArgs,
-) (io.Reader, error) {
-	// Buffer to collect raw audio
-	buffer := &bytes.Buffer{}
+) error {
+	defer func() { _ = args.Writer.Close() }()
 
 	// Set up capture I/O
 	g := new(errgroup.Group)
@@ -134,7 +133,7 @@ func LimitedCapture(
 
 		g.Go(func() error {
 			defer func() { _ = silenceWriter.Close() }()
-			_, err := io.Copy(buffer, silenceReader)
+			_, err := io.Copy(args.Writer, silenceReader)
 			return err
 		})
 
@@ -146,7 +145,7 @@ func LimitedCapture(
 		})
 	} else {
 		g.Go(func() error {
-			_, err := io.Copy(buffer, captureReader)
+			_, err := io.Copy(args.Writer, captureReader)
 			return err
 		})
 	}
@@ -162,12 +161,12 @@ func LimitedCapture(
 	})
 	_ = captureWriter.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return err
 	}
 
-	return buffer, nil
+	return nil
 }

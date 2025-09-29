@@ -37,7 +37,7 @@ type TranscribeConfig struct {
 	// NoClipboard disables copying transcription result to clipboard
 	NoClipboard bool `name:"no-clipboard" usage:"Disable copying transcription result to clipboard"`
 	// OutputFormat specifies the output format (none, text)
-	OutputFormat string `name:"output-format" value:"none" usage:"Output format (none, text)"`
+	OutputFormat string `name:"output-format" value:"text" usage:"Output format (none, text)"`
 }
 
 // validate validates the TranscribeConfig and returns an error if required fields are missing.
@@ -191,12 +191,12 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig) error {
 
 	transcription := t.Text
 	if !config.NoClipboard {
-		fmt.Println("Copying transcription to clipboard")
-		slog.Info("copying transcription to clipboard")
 		bs := bytes.NewBufferString(t.Text)
 		if err := clipboard.CopyToClipboard(ctx, logger, bs); err != nil {
 			return fmt.Errorf("failed to copy transcription output to clipboard, %w", err)
 		}
+		fmt.Println("Transcription copied to clipboard")
+		slog.Info("transcription copied to clipboard")
 	}
 
 	// Handle output based on format
@@ -204,6 +204,7 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig) error {
 	case "none":
 		// No output
 	case "text":
+		fmt.Println()
 		fmt.Println(transcription)
 	}
 
@@ -233,8 +234,8 @@ and sent to GPT-4o for transcription.
 By default, transcription results are copied to the clipboard. Use --no-clipboard to disable this.
 
 Output format can be controlled with --output-format:
-- none: No stdout output (default)
-- text: Plain text output to stdout
+- none: No stdout output
+- text: Plain text output to stdout (default)
 
 Examples:
   # Capture and transcribe from microphone (clipboard default)

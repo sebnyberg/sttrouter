@@ -21,7 +21,7 @@ type OpenAIConfig struct {
 	// APIKey is the Azure OpenAI API key
 	APIKey string `name:"api-key"`
 	// BaseURL is the API base URL
-	BaseURL string `name:"base-url" value:"https://seblab-ai.openai.azure.com/openai/deployments/gpt-4o-transcribe"`
+	BaseURL string `name:"base-url"`
 }
 
 // TranscribeConfig holds transcribe specific configuration flags.
@@ -42,14 +42,18 @@ type TranscribeConfig struct {
 	Capture CaptureConfig
 	// NoClipboard disables copying transcription result to clipboard
 	NoClipboard bool `name:"no-clipboard" usage:"Disable copying transcription result to clipboard"`
+	// NoCapture disables audio capture and uses a provided file instead
+	NoCapture bool `name:"no-capture" usage:"Disable audio capture and use provided file for transcription"`
 	// OutputFormat specifies the output format (none, text)
 	OutputFormat string `name:"output-format" value:"text" usage:"Output format (none, text)"`
 }
 
 // validate validates the TranscribeConfig and returns an error if required fields are missing.
 func (c *TranscribeConfig) validate() error {
-	if err := c.Capture.validate(); err != nil {
-		return fmt.Errorf("capture config validation err, %w", err)
+	if !c.NoCapture {
+		if err := c.Capture.validate(); err != nil {
+			return fmt.Errorf("capture config validation err, %w", err)
+		}
 	}
 	if c.OpenAI.APIKey == "" {
 		return fmt.Errorf("API key is required (use --openai-api-key or set OPENAI_API_KEY environment variable)")
@@ -154,33 +158,41 @@ func runCaptureToWriter(baseConfig *Config, config *TranscribeConfig, resultsWri
 }
 
 // runTranscribe executes the audio transcription logic.
-func runTranscribe(baseConfig *Config, config *TranscribeConfig) error {
+func runTranscribe(baseConfig *Config, config *TranscribeConfig, inputFile string) error {
 	ctx := context.Background()
 
 	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
 
-	// Create temp file and capture audio to it
-	tempFile, err := os.CreateTemp("", "sttrouter-capture-*.flac")
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
+	var audioFilePath string
+	if config.NoCapture {
+		// Use the provided file directly
+		audioFilePath = inputFile
+		fmt.Println("Using provided audio file for transcription")
+	} else {
+		// Create temp file and capture audio to it
+		tempFile, err := os.CreateTemp("", "sttrouter-capture-*.flac")
+		if err != nil {
+			return fmt.Errorf("failed to create temp file: %w", err)
+		}
+		slog.Debug("tempfile created", "path", tempFile.Name())
+		fmt.Println("Audio capture started")
+		if err := runCaptureToWriter(baseConfig, config, tempFile); err != nil {
+			return err
+		}
+		if _, err := tempFile.Seek(0, 0); err != nil {
+			return fmt.Errorf("failed to seek tempfile back to the beginning, %w", err)
+		}
+		fmt.Println("Audio capture completed")
+		slog.Info("capture completed")
+		audioFilePath = tempFile.Name()
 	}
-	slog.Debug("tempfile created", "path", tempFile.Name())
-	fmt.Println("Audio capture started")
-	if err := runCaptureToWriter(baseConfig, config, tempFile); err != nil {
-		return err
-	}
-	if _, err := tempFile.Seek(0, 0); err != nil {
-		return fmt.Errorf("failed to seek tempfile back to the beginning, %w", err)
-	}
-	fmt.Println("Audio capture completed")
-	slog.Info("capture completed")
 
 	client := openaix.NewClient(config.OpenAI.APIKey, config.OpenAI.BaseURL, config.AdditionalQueryParams)
 
 	// Prepare transcription request
 	req := openaix.TranscriptionRequest{
-		File:           tempFile.Name(),
+		File:           audioFilePath,
 		Model:          config.Model,
 		Language:       config.Language,
 		ResponseFormat: config.ResponseFormat,
@@ -231,11 +243,14 @@ func NewTranscribeCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "transcribe",
 		Usage:     "Capture audio from microphone and transcribe to text using Azure OpenAI GPT-4o",
-		ArgsUsage: "",
+		ArgsUsage: "[FILE]",
 		Description: `Capture audio from the microphone and transcribe it to text using Azure OpenAI's GPT-4o.
 
 Audio is captured from the microphone, converted to FLAC format,
 and sent to GPT-4o for transcription.
+
+Use --no-capture to skip audio capture and transcribe an existing audio file instead.
+When --no-capture is used, FILE is a required positional argument.
 
 By default, transcription results are copied to the clipboard. Use --no-clipboard to disable this.
 
@@ -251,12 +266,20 @@ Examples:
   sttrouter transcribe --api-key YOUR_KEY --no-clipboard
 
   # Capture and output to stdout in addition to clipboard
-  sttrouter transcribe --api-key YOUR_KEY --output-format text`,
+  sttrouter transcribe --api-key YOUR_KEY --output-format text
+
+  # Transcribe an existing audio file
+  sttrouter transcribe --no-capture --api-key YOUR_KEY recording.flac`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
-			// No arguments needed
-			if c.NArg() > 0 {
-				return fmt.Errorf("no arguments expected")
+			if transcribeConfig.NoCapture {
+				if c.NArg() != 1 {
+					return fmt.Errorf("exactly one argument (FILE) is required when using --no-capture")
+				}
+			} else {
+				if c.NArg() > 0 {
+					return fmt.Errorf("no arguments expected when capturing from microphone")
+				}
 			}
 
 			if err := baseConfig.validate(); err != nil {
@@ -267,7 +290,7 @@ Examples:
 				return err
 			}
 
-			return runTranscribe(&baseConfig, &transcribeConfig)
+			return runTranscribe(&baseConfig, &transcribeConfig, c.Args().Get(0))
 		},
 	}
 }

@@ -27,7 +27,7 @@ type TranscribeConfig struct {
 	// Temperature specifies the sampling temperature (0.0 to 1.0)
 	Temperature float64 `name:"temperature" value:"0" usage:"Sampling temperature (0.0 to 1.0)"`
 	// Azure OpenAI API Key
-	APIKey string `name:"api-key"`
+	APIKey string `name:"api-key" env:"OPENAI_API_KEY"`
 	// API Base URL
 	BaseURL string `name:"base-url" value:"https://seblab-ai.openai.azure.com/openai/deployments/gpt-4o-transcribe"`
 	// Additional query parameters for the API request
@@ -46,7 +46,7 @@ func (c *TranscribeConfig) validate() error {
 		return fmt.Errorf("capture config validation err, %w", err)
 	}
 	if c.APIKey == "" {
-		return fmt.Errorf("API key is required (use --api-key or set API_KEY environment variable)")
+		return fmt.Errorf("API key is required (use --api-key or set OPENAI_API_KEY environment variable)")
 	}
 	switch c.OutputFormat {
 	case "none", "text":

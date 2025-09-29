@@ -56,7 +56,7 @@ sttrouter transcribe --api-key YOUR_AZURE_KEY --base-url https://your-resource.o
 Set API key as environment variable:
 
 ```bash
-export API_KEY="your-azure-openai-key"
+export OPENAI_API_KEY="your-azure-openai-key"
 sttrouter transcribe
 ```
 

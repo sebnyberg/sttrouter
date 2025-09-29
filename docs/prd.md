@@ -86,7 +86,7 @@ The solution succeeds by providing flexibility in how transcribed text is delive
 ### 6. User Responsibilities
 
 **FR6.1:** Users MUST create and maintain their own Azure OpenAI account for access to GPT-4o services
-**FR6.2:** Users MUST obtain and configure their own Azure OpenAI API keys via the API_KEY environment variable
+**FR6.2:** Users MUST obtain and configure their own Azure OpenAI API keys via the OPENAI_API_KEY environment variable
 **FR6.3:** Users are RESPONSIBLE for all Azure OpenAI API usage costs and billing management
 **FR6.4:** Users MUST ensure their Azure OpenAI account has sufficient credit/billing setup before using transcription features
 **FR6.5:** Users MUST comply with Azure OpenAI's terms of service and usage policies when using transcription features

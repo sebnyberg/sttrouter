@@ -1,18 +1,15 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/sebnyberg/flagtags"
 	"github.com/sebnyberg/sttrouter/audio"
-	"github.com/sebnyberg/sttrouter/clipboard"
 	"github.com/sebnyberg/sttrouter/openaix"
 	"github.com/urfave/cli/v2"
 )
@@ -34,45 +31,34 @@ type TranscribeConfig struct {
 	// Additional query parameters for the API request
 	AdditionalQueryParams string `name:"query-params" value:"api-version=2025-03-01-preview" usage:"Query params"`
 	// Capture mode: enable audio capture from microphone
-	Capture bool `name:"capture" usage:"Capture audio from microphone instead of using file/stdin"`
-	// Duration specifies the capture duration (e.g., "10s", "1m")
-	CaptureDuration string `name:"duration" value:"0s" usage:"Capture duration (e.g., 10s, 1m)"`
-	// Device specifies the audio device name (defaults to system default)
-	CaptureDevice string `name:"device" usage:"Audio device name (defaults to system default)"`
-	// SampleRate specifies the sample rate in Hz (overrides device default)
-	CaptureSampleRate string `name:"rate" usage:"Sample rate in Hz (overrides device default)"`
-	// Channels specifies the number of audio channels
-	CaptureChannels int `name:"channels" value:"2" usage:"Number of audio channels"`
-	// BitDepth specifies the audio bit depth
-	CaptureBitDepth int `name:"bit-depth" value:"16" usage:"Audio bit depth"`
-	// EnableSilence enables silence-based auto-stop
-	CaptureEnableSilence bool `name:"silence" usage:"Enable silence-based auto-stop"`
-	// SilenceThreshold specifies the silence detection threshold (0.0-1.0)
-	CaptureSilenceThreshold float64 `name:"silence-threshold" value:"0.01" usage:"Silence detection threshold (0.0-1.0)"`
-	// SilenceMinDuration specifies the minimum silence duration to trigger stop (e.g., "1s")
-	CaptureSilenceMinDuration string `name:"silence-min-duration" value:"1s" usage:"Min silence duration to stop"`
-	// Clipboard enables copying transcription result to clipboard
+	DoCapture bool `name:"capture" usage:"Capture audio from microphone instead of using file/stdin"`
+	// Configuration for audio capture
+	Capture CaptureConfig
+	// Whether to transcribe to clipboard
 	Clipboard bool `name:"clipboard" usage:"Copy transcription result to clipboard"`
-	// OutputFormat specifies the output format (none, text, json)
-	OutputFormat string `name:"output-format" value:"text" usage:"Output format (none, text, json)"`
+	// OutputFormat specifies the output format (none, text)
+	OutputFormat string `name:"output-format" value:"text" usage:"Output format (none, text)"`
 }
 
 // validate validates the TranscribeConfig and returns an error if required fields are missing.
 func (c *TranscribeConfig) validate() error {
+	if err := c.Capture.validate(); err != nil {
+		return fmt.Errorf("capture config validation err, %w", err)
+	}
 	if c.APIKey == "" {
 		return fmt.Errorf("API key is required (use --api-key or set API_KEY environment variable)")
 	}
 	switch c.OutputFormat {
-	case "none", "text", "json":
+	case "none", "text":
 		// Valid output formats
 	default:
-		return fmt.Errorf("invalid output format: %s (valid values: none, text, json)", c.OutputFormat)
+		return fmt.Errorf("invalid output format: %s (valid values: none, text)", c.OutputFormat)
 	}
 	return nil
 }
 
-// runCaptureToReader captures audio and returns an io.Reader for the captured audio data.
-func runCaptureToReader(baseConfig *Config, config *TranscribeConfig) io.Reader {
+// runCaptureToWriter captures audio and writes it directly to the specified temp file
+func runCaptureToWriter(baseConfig *Config, config *TranscribeConfig, resultsWriter io.Writer) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -88,38 +74,34 @@ func runCaptureToReader(baseConfig *Config, config *TranscribeConfig) io.Reader 
 
 	// Resolve device
 	var selectedDevice audio.Device
-	if config.CaptureDevice == "" {
+	if config.Capture.Device == "" {
 		selectedDevice, err = audio.GetDefaultSource(spDevices)
 		if err != nil {
 			panic(fmt.Errorf("failed to get default source device: %w", err))
 		}
 	} else {
-		selectedDevice, err = audio.GetDevice(config.CaptureDevice, spDevices)
+		selectedDevice, err = audio.GetDevice(config.Capture.Device, spDevices)
 		if err != nil {
-			panic(fmt.Errorf("device '%s' not found", config.CaptureDevice))
+			panic(fmt.Errorf("device '%s' not found", config.Capture.Device))
 		}
 	}
 
 	// Parse and set sample rate if provided
-	if config.CaptureSampleRate != "" {
-		rate, err := strconv.Atoi(config.CaptureSampleRate)
-		if err != nil {
-			panic(fmt.Errorf("invalid sample rate: %w", err))
-		}
-		selectedDevice.SampleRate = rate
+	if config.Capture.SampleRate != 0 {
+		selectedDevice.SampleRate = config.Capture.SampleRate
 	}
 
 	// Parse silence min duration if silence is enabled
 	var minSilenceDuration time.Duration
-	if config.CaptureEnableSilence {
-		minSilenceDuration, err = time.ParseDuration(config.CaptureSilenceMinDuration)
+	if config.Capture.EnableSilence {
+		minSilenceDuration, err = time.ParseDuration(config.Capture.SilenceMinDuration)
 		if err != nil {
 			panic(fmt.Errorf("invalid silence min duration: %w", err))
 		}
 	}
 
 	// Parse capture duration
-	duration, err := time.ParseDuration(config.CaptureDuration)
+	duration, err := time.ParseDuration(config.Capture.Duration)
 	if err != nil {
 		panic(fmt.Errorf("invalid capture duration: %w", err))
 	}
@@ -128,68 +110,56 @@ func runCaptureToReader(baseConfig *Config, config *TranscribeConfig) io.Reader 
 	slog.Debug("Starting audio capture for transcription",
 		"device_name", selectedDevice.Name,
 		"duration", duration,
-		"silence_enabled", config.CaptureEnableSilence)
+		"silence_enabled", config.Capture.EnableSilence)
 
 	reader, err := audio.LimitedCapture(ctx, logger, selectedDevice, audio.LimitedCaptureArgs{
-		EnableSilence:      config.CaptureEnableSilence,
-		SilenceThreshold:   config.CaptureSilenceThreshold,
+		EnableSilence:      config.Capture.EnableSilence,
+		SilenceThreshold:   config.Capture.SilenceThreshold,
 		SilenceMinDuration: minSilenceDuration,
 		Duration:           duration,
-		Channels:           config.CaptureChannels,
-		BitDepth:           config.CaptureBitDepth,
+		Channels:           config.Capture.Channels,
+		BitDepth:           config.Capture.BitDepth,
 	})
 	if err != nil {
 		panic(fmt.Errorf("audio capture failed: %w", err))
 	}
 
-	// Convert the raw audio to FLAC format in memory
-	var buf bytes.Buffer
+	// Convert the raw audio to FLAC format and write directly to temp file
 	err = audio.ConvertAudio(ctx, logger, audio.ConvertAudioArgs{
 		Reader:       reader,
-		Writer:       &buf,
+		Writer:       resultsWriter,
 		SourceFormat: "raw",
 		TargetFormat: "flac",
 		SampleRate:   selectedDevice.SampleRate,
-		Channels:     config.CaptureChannels,
-		BitDepth:     config.CaptureBitDepth,
+		Channels:     config.Capture.Channels,
+		BitDepth:     config.Capture.BitDepth,
 	})
 	if err != nil {
-		panic(fmt.Errorf("audio conversion failed: %w", err))
+		return fmt.Errorf("audio conversion failed: %w", err)
 	}
 
-	if baseConfig.Verbose {
-		slog.Debug("Audio capture completed successfully")
-	}
-
-	return &buf
+	return nil
 }
 
 // runTranscribe executes the audio transcription logic.
-func runTranscribe(baseConfig *Config, config *TranscribeConfig, audioReader io.Reader) error {
+func runTranscribe(baseConfig *Config, config *TranscribeConfig) error {
 	ctx := context.Background()
-	_ = ctx
 
 	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
 
-	// Create a temporary file for the audio data
-	tempFile, err := os.CreateTemp("", "sttrouter-transcribe-*.flac")
+	// Capture mode: create temp file and capture audio to it
+	tempFile, err := os.CreateTemp("", "sttrouter-capture-*.flac")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer func() { _ = os.Remove(tempFile.Name()) }() // Clean up temp file
-	defer func() { _ = tempFile.Close() }()
-
-	// Copy audio data from reader to temp file
-	_, err = io.Copy(tempFile, audioReader)
-	if err != nil {
-		return fmt.Errorf("failed to copy audio data to temp file: %w", err)
+	if err := runCaptureToWriter(baseConfig, config, tempFile); err != nil {
+		return err
 	}
-
-	// Close the temp file so it can be opened by the transcriber
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("failed to close temp file: %w", err)
+	if _, err := tempFile.Seek(0, 0); err != nil {
+		return fmt.Errorf("failed to seek tempfile back to the beginning, %w", err)
 	}
+	slog.Info("capture completed", "tmpfile", tempFile.Name())
 
 	client := openaix.NewClient(config.APIKey, config.BaseURL, config.AdditionalQueryParams)
 
@@ -214,32 +184,7 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig, audioReader io.
 	case "none":
 		// No output
 	case "text":
-		if config.Clipboard {
-			reader := bytes.NewReader([]byte(transcription))
-			if err := clipboard.CopyToClipboard(ctx, logger, reader); err != nil {
-				return fmt.Errorf("failed to copy to clipboard: %w", err)
-			}
-			if baseConfig.Verbose {
-				slog.Debug("Transcription copied to clipboard")
-			}
-		} else {
-			// Print to stdout by default
-			fmt.Println(transcription)
-		}
-	case "json":
-		// Output full JSON response
-		jsonOutput := fmt.Sprintf(`{"text": %q}`, transcription)
-		if config.Clipboard {
-			reader := bytes.NewReader([]byte(jsonOutput))
-			if err := clipboard.CopyToClipboard(ctx, logger, reader); err != nil {
-				return fmt.Errorf("failed to copy to clipboard: %w", err)
-			}
-			if baseConfig.Verbose {
-				slog.Debug("Transcription JSON copied to clipboard")
-			}
-		} else {
-			fmt.Println(jsonOutput)
-		}
+		fmt.Println(transcription)
 	}
 
 	if baseConfig.Verbose {
@@ -258,18 +203,15 @@ func NewTranscribeCommand() *cli.Command {
 
 	return &cli.Command{
 		Name:      "transcribe",
-		Usage:     "Transcribe audio from microphone or file to text using OpenAI Whisper API",
-		ArgsUsage: "[AUDIO_FILE]",
-		Description: `Transcribe audio to text using OpenAI's Whisper API.
+		Usage:     "Capture audio from microphone and transcribe to text using OpenAI Whisper API",
+		ArgsUsage: "",
+		Description: `Capture audio from the microphone and transcribe it to text using OpenAI's Whisper API.
 
-When --capture is specified, audio is captured from the microphone and transcribed.
-Otherwise, an AUDIO_FILE argument specifies the audio file to transcribe.
-Use "-" to read audio data from stdin when not using --capture.
-Supported formats include FLAC, MP3, MP4, MPEG, MPGA, M4A, OGG, WAV, and WEBM.
+The --capture flag is required. Audio is captured from the microphone, converted to FLAC format,
+and sent to the Whisper API for transcription.
 
 Output format can be controlled with --output-format:
 - text: Plain text output (default)
-- json: JSON formatted output
 - none: No output
 
 Use --clipboard to copy results to clipboard instead of stdout.
@@ -278,50 +220,16 @@ Examples:
   # Capture and transcribe from microphone
   sttrouter transcribe --capture --api-key YOUR_KEY
 
-  # Transcribe a FLAC file
-  sttrouter transcribe --api-key YOUR_KEY recording.flac
+  # Capture and copy transcription to clipboard
+  sttrouter transcribe --capture --api-key YOUR_KEY --clipboard
 
-  # Transcribe and copy to clipboard
-  sttrouter transcribe --api-key YOUR_KEY --clipboard recording.flac
-
-  # Transcribe with JSON output
-  sttrouter transcribe --api-key YOUR_KEY --output-format json recording.flac
-
-  # Transcribe with no output (silent)
-  sttrouter transcribe --api-key YOUR_KEY --output-format none recording.flac
-
-  # Transcribe from stdin
-  sttrouter transcribe --api-key YOUR_KEY -
-
-  # Transcribe to JSON format (legacy flag still works)
-  sttrouter transcribe --api-key YOUR_KEY --response-format json recording.flac`,
+  # Capture with no output (silent)
+  sttrouter transcribe --capture --api-key YOUR_KEY --output-format none`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
-			var audioReader io.Reader
-
-			if transcribeConfig.Capture {
-				// Capture mode: no arguments needed
-				if c.NArg() > 0 {
-					return fmt.Errorf("no arguments expected when using --capture")
-				}
-				audioReader = runCaptureToReader(&baseConfig, &transcribeConfig)
-			} else {
-				// File/stdin mode: require exactly one argument
-				if c.NArg() != 1 {
-					return fmt.Errorf("exactly one argument (AUDIO_FILE or - for stdin) is required")
-				}
-
-				audioArg := c.Args().Get(0)
-				if audioArg == "-" {
-					audioReader = os.Stdin
-				} else {
-					file, err := os.Open(audioArg)
-					if err != nil {
-						return fmt.Errorf("failed to open audio file: %w", err)
-					}
-					defer func() { _ = file.Close() }()
-					audioReader = file
-				}
+			// Capture mode: no arguments needed
+			if c.NArg() > 0 {
+				return fmt.Errorf("no arguments expected when using --capture")
 			}
 
 			if err := baseConfig.validate(); err != nil {
@@ -332,7 +240,7 @@ Examples:
 				return err
 			}
 
-			return runTranscribe(&baseConfig, &transcribeConfig, audioReader)
+			return runTranscribe(&baseConfig, &transcribeConfig)
 		},
 	}
 }

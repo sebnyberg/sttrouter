@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/sebnyberg/flagtags"
 	"github.com/sebnyberg/sttrouter/audio"
+	"github.com/sebnyberg/sttrouter/clipboard"
 	"github.com/sebnyberg/sttrouter/openaix"
 	"github.com/urfave/cli/v2"
 )
@@ -153,13 +155,14 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
+	slog.Debug("tempfile created", "path", tempFile.Name())
 	if err := runCaptureToWriter(baseConfig, config, tempFile); err != nil {
 		return err
 	}
 	if _, err := tempFile.Seek(0, 0); err != nil {
 		return fmt.Errorf("failed to seek tempfile back to the beginning, %w", err)
 	}
-	slog.Info("capture completed", "tmpfile", tempFile.Name())
+	slog.Info("capture completed")
 
 	client := openaix.NewClient(config.APIKey, config.BaseURL, config.AdditionalQueryParams)
 
@@ -176,8 +179,16 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to transcribe audio: %w", err)
 	}
+	slog.Info("transcription completed")
 
 	transcription := t.Text
+	if config.Clipboard {
+		slog.Info("copying transcription to clipboard")
+		bs := bytes.NewBufferString(t.Text)
+		if err := clipboard.CopyToClipboard(ctx, logger, bs); err != nil {
+			return fmt.Errorf("failed to copy transcription output to clipboard, %w", err)
+		}
+	}
 
 	// Handle output based on format
 	switch config.OutputFormat {
@@ -229,7 +240,7 @@ Examples:
 		Action: func(c *cli.Context) error {
 			// Capture mode: no arguments needed
 			if c.NArg() > 0 {
-				return fmt.Errorf("no arguments expected when using --capture")
+				return fmt.Errorf("no arguments expected")
 			}
 
 			if err := baseConfig.validate(); err != nil {

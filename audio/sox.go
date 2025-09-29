@@ -110,7 +110,7 @@ type ConvertAudioArgs struct {
 }
 
 // ConvertAudio converts audio from sourceFormat to targetFormat using sox
-func ConvertAudio(ctx context.Context, log *slog.Logger, args ConvertAudioArgs) error {
+func ConvertAudio(ctx context.Context, log *slog.Logger, args ConvertAudioArgs) (retErr error) {
 	// Source format
 	cmdArgs := []string{"-t", args.SourceFormat}
 	if args.SourceFormat == "raw" {

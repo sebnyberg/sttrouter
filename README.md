@@ -127,23 +127,14 @@ sttrouter transcribe --api-key YOUR_AZURE_API_KEY --language en recording.flac
 # Capture and transcribe from microphone
 sttrouter transcribe --capture --api-key YOUR_AZURE_API_KEY
 
-# Transcribe with specific language
-sttrouter transcribe --api-key YOUR_AZURE_API_KEY recording.flac
+# Capture and transcribe from microphone with JSON output
+sttrouter transcribe --capture --api-key YOUR_AZURE_API_KEY --output-format json
 
-# Transcribe and copy to clipboard
-sttrouter transcribe --api-key YOUR_AZURE_API_KEY --clipboard recording.flac
+# Capture and transcribe from microphone with no output (silent)
+sttrouter transcribe --capture --api-key YOUR_AZURE_API_KEY --output-format none
 
-# Transcribe with JSON output
-sttrouter transcribe --api-key YOUR_AZURE_API_KEY --output-format json recording.flac
-
-# Transcribe with no output (silent)
-sttrouter transcribe --api-key YOUR_AZURE_API_KEY --output-format none recording.flac
-
-# Transcribe from stdin
-sttrouter transcribe --api-key YOUR_AZURE_API_KEY -
-
-# Transcribe to JSON format
-sttrouter transcribe --api-key YOUR_AZURE_API_KEY --response-format json recording.flac
+# Capture and transcribe from microphone and copy to clipboard
+sttrouter transcribe --capture --api-key YOUR_AZURE_API_KEY --clipboard
 
 # Use custom query parameters
 sttrouter transcribe --api-key YOUR_AZURE_API_KEY --language en --query-params "api-version=2025-03-01-preview" recording.flac

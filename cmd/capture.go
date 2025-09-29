@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/sebnyberg/flagtags"
@@ -21,7 +20,7 @@ type CaptureConfig struct {
 	// Device specifies the audio device name (defaults to system default)
 	Device string `name:"device" usage:"Audio device name (defaults to system default)"`
 	// SampleRate specifies the sample rate in Hz (overrides device default)
-	SampleRate string `name:"rate" usage:"Sample rate in Hz (overrides device default)"`
+	SampleRate int `name:"rate" usage:"Sample rate in Hz (overrides device default)"`
 	// Channels specifies the number of audio channels
 	Channels int `name:"channels" value:"2" usage:"Number of audio channels"`
 	// BitDepth specifies the audio bit depth
@@ -32,6 +31,29 @@ type CaptureConfig struct {
 	SilenceThreshold float64 `name:"silence-threshold" value:"0.01" usage:"Silence detection threshold (0.0-1.0)"`
 	// SilenceMinDuration specifies the minimum silence duration to trigger stop (e.g., "1s")
 	SilenceMinDuration string `name:"silence-min-duration" value:"1s" usage:"Minimum silence duration to trigger stop"`
+}
+
+func (c *CaptureConfig) validate() error {
+	if _, err := time.ParseDuration(c.Duration); err != nil {
+		return fmt.Errorf("invalid capture duration '%v', %w", c.Duration, err)
+	}
+	if c.SampleRate < 0 {
+		return fmt.Errorf("sample rate must be >= 0, was '%v", c.SampleRate)
+	}
+	if c.Channels <= 0 || c.Channels > 2 {
+		return fmt.Errorf("channels must be 1 or 2, was '%v'", c.Channels)
+	}
+	if c.BitDepth <= 0 {
+		return fmt.Errorf("bit depth must be greater than 0, was '%v'", c.BitDepth)
+	}
+	const eps = 1e-5
+	if c.SilenceThreshold <= 0 || c.SilenceThreshold > 1.0+eps {
+		return fmt.Errorf("silence threshold must be in the interval (0,1.0], was '%v'", c.SilenceThreshold)
+	}
+	if _, err := time.ParseDuration(c.SilenceMinDuration); err != nil {
+		return fmt.Errorf("invalid silence min duration '%v', %w", c.SilenceMinDuration, err)
+	}
+	return nil
 }
 
 // runCapture executes the audio capture logic.
@@ -64,12 +86,8 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 	}
 
 	// Parse and set sample rate if provided
-	if config.SampleRate != "" {
-		rate, err := strconv.Atoi(config.SampleRate)
-		if err != nil {
-			return fmt.Errorf("invalid sample rate: %w", err)
-		}
-		selectedDevice.SampleRate = rate
+	if config.SampleRate != 0 {
+		selectedDevice.SampleRate = config.SampleRate
 	}
 
 	// Parse silence min duration if silence is enabled

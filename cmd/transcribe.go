@@ -16,6 +16,14 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// OpenAIConfig holds OpenAI-specific configuration.
+type OpenAIConfig struct {
+	// APIKey is the Azure OpenAI API key
+	APIKey string `name:"api-key"`
+	// BaseURL is the API base URL
+	BaseURL string `name:"base-url" value:"https://seblab-ai.openai.azure.com/openai/deployments/gpt-4o-transcribe"`
+}
+
 // TranscribeConfig holds transcribe specific configuration flags.
 type TranscribeConfig struct {
 	// Model specifies the GPT-4o model to use
@@ -26,10 +34,8 @@ type TranscribeConfig struct {
 	ResponseFormat string `name:"response-format" value:"text" usage:"Response format (json,text,srt,verbose_json,vtt)"`
 	// Temperature specifies the sampling temperature (0.0 to 1.0)
 	Temperature float64 `name:"temperature" value:"0" usage:"Sampling temperature (0.0 to 1.0)"`
-	// Azure OpenAI API Key
-	APIKey string `name:"api-key" env:"OPENAI_API_KEY"`
-	// API Base URL
-	BaseURL string `name:"base-url" value:"https://seblab-ai.openai.azure.com/openai/deployments/gpt-4o-transcribe"`
+	// OpenAI configuration
+	OpenAI OpenAIConfig `name:"openai"`
 	// Additional query parameters for the API request
 	AdditionalQueryParams string `name:"query-params" value:"api-version=2025-03-01-preview" usage:"Query params"`
 	// Configuration for audio capture
@@ -45,8 +51,8 @@ func (c *TranscribeConfig) validate() error {
 	if err := c.Capture.validate(); err != nil {
 		return fmt.Errorf("capture config validation err, %w", err)
 	}
-	if c.APIKey == "" {
-		return fmt.Errorf("API key is required (use --api-key or set OPENAI_API_KEY environment variable)")
+	if c.OpenAI.APIKey == "" {
+		return fmt.Errorf("API key is required (use --openai-api-key or set OPENAI_API_KEY environment variable)")
 	}
 	switch c.OutputFormat {
 	case "none", "text":
@@ -170,7 +176,7 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig) error {
 	fmt.Println("Audio capture completed")
 	slog.Info("capture completed")
 
-	client := openaix.NewClient(config.APIKey, config.BaseURL, config.AdditionalQueryParams)
+	client := openaix.NewClient(config.OpenAI.APIKey, config.OpenAI.BaseURL, config.AdditionalQueryParams)
 
 	// Prepare transcription request
 	req := openaix.TranscriptionRequest{

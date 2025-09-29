@@ -36,7 +36,7 @@ type CaptureConfig struct {
 func (c *CaptureConfig) validate() error {
 	if c.Duration != "" {
 		if _, err := time.ParseDuration(c.Duration); err != nil {
-			return fmt.Errorf("invalid capture duration '%v', %w", c.Duration, err)
+			return fmt.Errorf("invalid duration '%v', %w", c.Duration, err)
 		}
 	}
 	if c.SampleRate < 0 {

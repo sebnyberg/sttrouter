@@ -118,7 +118,7 @@ func LimitedCapture(
 	if args.EnableAutoStop {
 		// Set up auto-stop splitter
 		autoStopReader, autoStopWriter := io.Pipe()
-		splitter := NewAutoStopSplitter(
+		splitter := NewSilenceSplitter(
 			ctx,
 			args.Channels,
 			args.BitDepth,

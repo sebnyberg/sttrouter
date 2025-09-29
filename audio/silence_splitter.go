@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// AutoStopSplitter implements io.Writer and splits the audio stream into segments based on auto-stop detection
-type AutoStopSplitter struct {
+// SilenceSplitter implements io.Writer and splits the audio stream into segments based on auto-stop detection
+type SilenceSplitter struct {
 	ctx              context.Context
 	channels         int
 	bitDepth         int
@@ -19,19 +19,19 @@ type AutoStopSplitter struct {
 	callback         func([]byte)
 }
 
-// NewAutoStopSplitter creates a new AutoStopSplitter
-func NewAutoStopSplitter(
+// NewSilenceSplitter creates a new SilenceSplitter
+func NewSilenceSplitter(
 	ctx context.Context,
 	channels, bitDepth int,
 	threshold float64,
 	minDuration time.Duration,
 	sampleRate int,
 	callback func([]byte),
-) *AutoStopSplitter {
+) *SilenceSplitter {
 	maxAmp := 1 << uint(bitDepth-1)
 	thresh := int(threshold * float64(maxAmp))
 	minSamples := int(minDuration.Seconds() * float64(sampleRate) * float64(channels))
-	return &AutoStopSplitter{
+	return &SilenceSplitter{
 		ctx:              ctx,
 		channels:         channels,
 		bitDepth:         bitDepth,
@@ -44,7 +44,7 @@ func NewAutoStopSplitter(
 }
 
 // Write implements io.Writer
-func (s *AutoStopSplitter) Write(p []byte) (n int, err error) {
+func (s *SilenceSplitter) Write(p []byte) (n int, err error) {
 	s.buffer.Write(p)
 
 	// Process the new data for auto-stop detection
@@ -84,7 +84,7 @@ func (s *AutoStopSplitter) Write(p []byte) (n int, err error) {
 }
 
 // flush calls the callback with the buffered data
-func (s *AutoStopSplitter) flush() {
+func (s *SilenceSplitter) flush() {
 	if s.buffer.Len() == 0 {
 		return
 	}
@@ -94,6 +94,6 @@ func (s *AutoStopSplitter) flush() {
 }
 
 // Flush forces flushing of any remaining buffered data
-func (s *AutoStopSplitter) Flush() {
+func (s *SilenceSplitter) Flush() {
 	s.flush()
 }

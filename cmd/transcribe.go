@@ -32,14 +32,12 @@ type TranscribeConfig struct {
 	BaseURL string `name:"base-url" value:"https://seblab-ai.openai.azure.com/openai/deployments/gpt-4o-transcribe"`
 	// Additional query parameters for the API request
 	AdditionalQueryParams string `name:"query-params" value:"api-version=2025-03-01-preview" usage:"Query params"`
-	// Capture mode: enable audio capture from microphone
-	DoCapture bool `name:"capture" usage:"Capture audio from microphone instead of using file/stdin"`
 	// Configuration for audio capture
 	Capture CaptureConfig
-	// Whether to transcribe to clipboard
-	Clipboard bool `name:"clipboard" usage:"Copy transcription result to clipboard"`
+	// NoClipboard disables copying transcription result to clipboard
+	NoClipboard bool `name:"no-clipboard" usage:"Disable copying transcription result to clipboard"`
 	// OutputFormat specifies the output format (none, text)
-	OutputFormat string `name:"output-format" value:"text" usage:"Output format (none, text)"`
+	OutputFormat string `name:"output-format" value:"none" usage:"Output format (none, text)"`
 }
 
 // validate validates the TranscribeConfig and returns an error if required fields are missing.
@@ -93,12 +91,12 @@ func runCaptureToWriter(baseConfig *Config, config *TranscribeConfig, resultsWri
 		selectedDevice.SampleRate = config.Capture.SampleRate
 	}
 
-	// Parse silence min duration if silence is enabled
+	// Parse auto-stop min duration if auto-stop is enabled
 	var minSilenceDuration time.Duration
-	if config.Capture.EnableSilence {
-		minSilenceDuration, err = time.ParseDuration(config.Capture.SilenceMinDuration)
+	if !config.Capture.NoAutoStop {
+		minSilenceDuration, err = time.ParseDuration(config.Capture.AutoStopMinDuration)
 		if err != nil {
-			panic(fmt.Errorf("invalid silence min duration: %w", err))
+			panic(fmt.Errorf("invalid auto-stop min duration: %w", err))
 		}
 	}
 
@@ -112,20 +110,20 @@ func runCaptureToWriter(baseConfig *Config, config *TranscribeConfig, resultsWri
 	slog.Debug("Starting audio capture for transcription",
 		"device_name", selectedDevice.Name,
 		"duration", duration,
-		"silence_enabled", config.Capture.EnableSilence)
+		"auto_stop_enabled", !config.Capture.NoAutoStop)
 
 	pipeReader, pipeWriter := io.Pipe()
 
 	// Run LimitedCapture in a goroutine so it can write to the pipe concurrently with ConvertAudio reading
 	go func() {
 		err = audio.LimitedCapture(ctx, logger, selectedDevice, audio.LimitedCaptureArgs{
-			EnableSilence:      config.Capture.EnableSilence,
-			SilenceThreshold:   config.Capture.SilenceThreshold,
-			SilenceMinDuration: minSilenceDuration,
-			Duration:           duration,
-			Channels:           config.Capture.Channels,
-			BitDepth:           config.Capture.BitDepth,
-			Writer:             pipeWriter,
+			EnableAutoStop:      !config.Capture.NoAutoStop,
+			AutoStopThreshold:   config.Capture.AutoStopThreshold,
+			AutoStopMinDuration: minSilenceDuration,
+			Duration:            duration,
+			Channels:            config.Capture.Channels,
+			BitDepth:            config.Capture.BitDepth,
+			Writer:              pipeWriter,
 		})
 		if err != nil {
 			panic(fmt.Errorf("audio capture failed: %w", err))
@@ -156,18 +154,20 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig) error {
 	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
 
-	// Capture mode: create temp file and capture audio to it
+	// Create temp file and capture audio to it
 	tempFile, err := os.CreateTemp("", "sttrouter-capture-*.flac")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	slog.Debug("tempfile created", "path", tempFile.Name())
+	fmt.Println("Audio capture started")
 	if err := runCaptureToWriter(baseConfig, config, tempFile); err != nil {
 		return err
 	}
 	if _, err := tempFile.Seek(0, 0); err != nil {
 		return fmt.Errorf("failed to seek tempfile back to the beginning, %w", err)
 	}
+	fmt.Println("Audio capture completed")
 	slog.Info("capture completed")
 
 	client := openaix.NewClient(config.APIKey, config.BaseURL, config.AdditionalQueryParams)
@@ -181,14 +181,17 @@ func runTranscribe(baseConfig *Config, config *TranscribeConfig) error {
 		Temperature:    config.Temperature,
 	}
 
+	fmt.Println("Transcription started")
 	t, err := client.Transcribe(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to transcribe audio: %w", err)
 	}
+	fmt.Println("Transcription completed")
 	slog.Info("transcription completed")
 
 	transcription := t.Text
-	if config.Clipboard {
+	if !config.NoClipboard {
+		fmt.Println("Copying transcription to clipboard")
 		slog.Info("copying transcription to clipboard")
 		bs := bytes.NewBufferString(t.Text)
 		if err := clipboard.CopyToClipboard(ctx, logger, bs); err != nil {
@@ -224,27 +227,27 @@ func NewTranscribeCommand() *cli.Command {
 		ArgsUsage: "",
 		Description: `Capture audio from the microphone and transcribe it to text using Azure OpenAI's GPT-4o.
 
-The --capture flag is required. Audio is captured from the microphone, converted to FLAC format,
+Audio is captured from the microphone, converted to FLAC format,
 and sent to GPT-4o for transcription.
 
-Output format can be controlled with --output-format:
-- text: Plain text output (default)
-- none: No output
+By default, transcription results are copied to the clipboard. Use --no-clipboard to disable this.
 
-Use --clipboard to copy results to clipboard instead of stdout.
+Output format can be controlled with --output-format:
+- none: No stdout output (default)
+- text: Plain text output to stdout
 
 Examples:
-  # Capture and transcribe from microphone
-  sttrouter transcribe --capture --api-key YOUR_KEY
+  # Capture and transcribe from microphone (clipboard default)
+  sttrouter transcribe --api-key YOUR_KEY
 
-  # Capture and copy transcription to clipboard
-  sttrouter transcribe --capture --api-key YOUR_KEY --clipboard
+  # Capture and transcribe without copying to clipboard
+  sttrouter transcribe --api-key YOUR_KEY --no-clipboard
 
-  # Capture with no output (silent)
-  sttrouter transcribe --capture --api-key YOUR_KEY --output-format none`,
+  # Capture and output to stdout in addition to clipboard
+  sttrouter transcribe --api-key YOUR_KEY --output-format text`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
-			// Capture mode: no arguments needed
+			// No arguments needed
 			if c.NArg() > 0 {
 				return fmt.Errorf("no arguments expected")
 			}

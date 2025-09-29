@@ -10,7 +10,7 @@ sttrouter/
 │   ├── audio.go            # Audio conversion utilities
 │   ├── device.go           # Device data structures and utilities
 │   ├── errors.go           # Sentinel error definitions
-│   ├── silence.go          # Silence detection for audio capture
+│   ├── auto-stop.go          # Auto-stop detection for audio capture
 │   ├── sox.go              # Sox-based audio capture
 │   ├── system_profiler.go  # macOS system_profiler-based device listing
 │   ├── sox_test.go         # Tests for sox functionality
@@ -78,7 +78,7 @@ sttrouter/
 - **`audio.go`** - Audio conversion utilities (FLAC encoding)
 - **`device.go`** - Device data structures and utilities
 - **`errors.go`** - Sentinel error definitions
-- **`silence.go`** - Silence detection for audio capture
+- **`auto-stop.go`** - Auto-stop detection for audio capture
 - **`sox.go`** - Sox-based audio capture implementation
   - Uses sox command-line tool for audio capture from devices
 - **`system_profiler.go`** - macOS system_profiler-based device listing implementation

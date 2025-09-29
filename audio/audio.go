@@ -91,16 +91,16 @@ func GetDevice(name string, spDevices []Device) (Device, error) {
 
 // LimitedCaptureArgs holds the arguments for limited capture
 type LimitedCaptureArgs struct {
-	EnableSilence      bool
-	SilenceThreshold   float64
-	SilenceMinDuration time.Duration
-	Duration           time.Duration
-	Channels           int
-	BitDepth           int
-	Writer             io.WriteCloser
+	EnableAutoStop      bool
+	AutoStopThreshold   float64
+	AutoStopMinDuration time.Duration
+	Duration            time.Duration
+	Channels            int
+	BitDepth            int
+	Writer              io.WriteCloser
 }
 
-// LimitedCapture captures raw audio from the device until silence is detected or duration expires
+// LimitedCapture captures raw audio from the device until auto-stop is detected or duration expires
 func LimitedCapture(
 	ctx context.Context,
 	logger *slog.Logger,
@@ -115,30 +115,30 @@ func LimitedCapture(
 
 	captureCtx, captureCancel := context.WithCancel(ctx)
 	defer captureCancel()
-	if args.EnableSilence {
-		// Set up silence splitter
-		silenceReader, silenceWriter := io.Pipe()
-		splitter := NewSilenceSplitter(
+	if args.EnableAutoStop {
+		// Set up auto-stop splitter
+		autoStopReader, autoStopWriter := io.Pipe()
+		splitter := NewAutoStopSplitter(
 			ctx,
 			args.Channels,
 			args.BitDepth,
-			args.SilenceThreshold,
-			args.SilenceMinDuration,
+			args.AutoStopThreshold,
+			args.AutoStopMinDuration,
 			device.SampleRate,
 			func(data []byte) {
-				_, _ = silenceWriter.Write(data)
+				_, _ = autoStopWriter.Write(data)
 				captureCancel()
 			},
 		)
 
 		g.Go(func() error {
-			defer func() { _ = silenceWriter.Close() }()
-			_, err := io.Copy(args.Writer, silenceReader)
+			defer func() { _ = autoStopWriter.Close() }()
+			_, err := io.Copy(args.Writer, autoStopReader)
 			return err
 		})
 
 		g.Go(func() error {
-			defer func() { _ = silenceWriter.Close() }()
+			defer func() { _ = autoStopWriter.Close() }()
 			_, err := io.Copy(splitter, captureReader)
 			splitter.Flush() // Flush any remaining data
 			return err

@@ -25,12 +25,12 @@ type CaptureConfig struct {
 	Channels int `name:"channels" value:"2" usage:"Number of audio channels"`
 	// BitDepth specifies the audio bit depth
 	BitDepth int `name:"bit-depth" value:"16" usage:"Audio bit depth"`
-	// EnableSilence enables silence-based auto-stop
-	EnableSilence bool `name:"auto-stop" usage:"Enable auto-stop when silence is detected"`
-	// SilenceThreshold specifies the silence detection threshold (0.0-1.0)
-	SilenceThreshold float64 `name:"silence-threshold" value:"0.01" usage:"Silence detection threshold (0.0-1.0)"`
-	// SilenceMinDuration specifies the minimum silence duration to trigger stop (e.g., "1s")
-	SilenceMinDuration string `name:"silence-min-duration" value:"1s" usage:"Minimum silence duration to trigger stop"`
+	// NoAutoStop disables auto-stop when silence is detected
+	NoAutoStop bool `name:"no-auto-stop" usage:"Disable auto-stop when silence is detected"`
+	// AutoStopThreshold specifies the auto-stop detection threshold (0.0-1.0)
+	AutoStopThreshold float64 `name:"auto-stop-threshold" value:"0.01" usage:"Auto-stop detection threshold (0.0-1.0)"`
+	// AutoStopMinDuration specifies the minimum silence duration to trigger stop (e.g., "1s")
+	AutoStopMinDuration string `name:"auto-stop-min-duration" value:"1s" usage:"Minimum silence duration to trigger stop"`
 }
 
 func (c *CaptureConfig) validate() error {
@@ -49,11 +49,11 @@ func (c *CaptureConfig) validate() error {
 		return fmt.Errorf("bit depth must be greater than 0, was '%v'", c.BitDepth)
 	}
 	const eps = 1e-5
-	if c.SilenceThreshold <= 0 || c.SilenceThreshold > 1.0+eps {
-		return fmt.Errorf("silence threshold must be in the interval (0,1.0], was '%v'", c.SilenceThreshold)
+	if c.AutoStopThreshold <= 0 || c.AutoStopThreshold > 1.0+eps {
+		return fmt.Errorf("auto-stop threshold must be in the interval (0,1.0], was '%v'", c.AutoStopThreshold)
 	}
-	if _, err := time.ParseDuration(c.SilenceMinDuration); err != nil {
-		return fmt.Errorf("invalid silence min duration '%v', %w", c.SilenceMinDuration, err)
+	if _, err := time.ParseDuration(c.AutoStopMinDuration); err != nil {
+		return fmt.Errorf("invalid auto-stop min duration '%v', %w", c.AutoStopMinDuration, err)
 	}
 	return nil
 }
@@ -92,12 +92,12 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		selectedDevice.SampleRate = config.SampleRate
 	}
 
-	// Parse silence min duration if silence is enabled
+	// Parse auto-stop min duration if auto-stop is enabled
 	var minSilenceDuration time.Duration
-	if config.EnableSilence {
-		minSilenceDuration, err = time.ParseDuration(config.SilenceMinDuration)
+	if !config.NoAutoStop {
+		minSilenceDuration, err = time.ParseDuration(config.AutoStopMinDuration)
 		if err != nil {
-			return fmt.Errorf("invalid silence min duration: %w", err)
+			return fmt.Errorf("invalid auto-stop min duration: %w", err)
 		}
 	}
 
@@ -106,7 +106,7 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 		"device_name", selectedDevice.Name,
 		"duration", duration,
 		"output", outputFile,
-		"silence_enabled", config.EnableSilence)
+		"auto_stop_enabled", !config.NoAutoStop)
 
 	// Asynchronously read from the capture inputs into the Converter, which in
 	// turn writes to the FLAC output
@@ -129,13 +129,13 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 	// Run LimitedCapture in a goroutine so it can write to the pipe concurrently with ConvertAudio reading
 	go func() {
 		err := audio.LimitedCapture(ctx, logger, selectedDevice, audio.LimitedCaptureArgs{
-			EnableSilence:      config.EnableSilence,
-			SilenceThreshold:   config.SilenceThreshold,
-			SilenceMinDuration: minSilenceDuration,
-			Duration:           duration,
-			Channels:           config.Channels,
-			BitDepth:           config.BitDepth,
-			Writer:             pipeWriter,
+			EnableAutoStop:      !config.NoAutoStop,
+			AutoStopThreshold:   config.AutoStopThreshold,
+			AutoStopMinDuration: minSilenceDuration,
+			Duration:            duration,
+			Channels:            config.Channels,
+			BitDepth:            config.BitDepth,
+			Writer:              pipeWriter,
 		})
 		if err != nil {
 			slog.Error("Audio capture failed", "error", err, "device", selectedDevice)
@@ -180,12 +180,17 @@ The OUTPUT_FILE is a required positional argument that specifies where to send t
 Use "-" to output to stdout.
 Output format is always FLAC.
 
+By default, capture stops automatically when silence is detected. Use --no-auto-stop to disable this.
+
 Examples:
-  # Output to file
+  # Output to file (with auto-stop)
   sttrouter capture recording.flac
   
   # Output to stdout
-  sttrouter capture -`,
+  sttrouter capture -
+
+  # Capture for 10 seconds without auto-stop
+  sttrouter capture --duration 10s --no-auto-stop recording.flac`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
 			if c.NArg() != 1 {

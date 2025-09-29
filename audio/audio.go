@@ -152,6 +152,7 @@ func LimitedCapture(
 	}
 
 	// Capture audio until duration is finished.
+	logger.Info("audio capture started")
 	err := CaptureAudio(captureCtx, logger, CaptureArgs{
 		Device:   device,
 		Duration: args.Duration,

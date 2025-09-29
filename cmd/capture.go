@@ -26,7 +26,7 @@ type CaptureConfig struct {
 	// BitDepth specifies the audio bit depth
 	BitDepth int `name:"bit-depth" value:"16" usage:"Audio bit depth"`
 	// EnableSilence enables silence-based auto-stop
-	EnableSilence bool `name:"silence" usage:"Enable silence-based auto-stop"`
+	EnableSilence bool `name:"auto-stop" usage:"Enable auto-stop when silence is detected"`
 	// SilenceThreshold specifies the silence detection threshold (0.0-1.0)
 	SilenceThreshold float64 `name:"silence-threshold" value:"0.01" usage:"Silence detection threshold (0.0-1.0)"`
 	// SilenceMinDuration specifies the minimum silence duration to trigger stop (e.g., "1s")

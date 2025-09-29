@@ -13,26 +13,16 @@ The problem is particularly acute during:
 
 ## Proposed Solution
 
-WhisperClip provides a flexible speech-to-text transcription system through two integrated components:
-
-**Go CLI Application:** A versatile command-line tool that handles audio capture and manages API communication with OpenAI's Whisper API. The CLI offers multiple output modes to fit different workflows:
+sttrouter provides a flexible speech-to-text transcription system through a Go CLI application that handles audio capture and manages API communication with Azure OpenAI's GPT-4o. The CLI offers multiple output modes to fit different workflows:
 
 - **Clipboard mode:** Direct transcription to system clipboard
 - **Stdout mode:** Pipe transcribed text to stdout for command-line workflows
 - **File mode:** Write transcription directly to specified files
 
-**VSCode Extension:** A development environment integration that provides intuitive activation and multiple insertion methods:
-
-- **Phase 1:** Direct-to-clipboard transcription with manual paste
-- **Phase 2:** Smart cursor insertion that places transcribed text at current cursor position
-- **Integration:** Communicates with Go CLI and provides visual feedback for transcription status
-
 **Key Differentiators:**
 
 - **Output Flexibility:** Multiple modes support different use cases and workflows
-- **Progressive Enhancement:** Start simple (clipboard) and evolve to smarter integration (cursor insertion)
-- **CLI Versatility:** Standalone CLI utility that works beyond just VSCode
-- **Cloud-Powered Accuracy:** Leverages OpenAI's Whisper API for superior transcription quality
+- **Cloud-Powered Accuracy:** Leverages Azure OpenAI's GPT-4o for superior transcription quality
 - **Personal Optimization:** Tailored for single-user MacOS environment
 
 The solution succeeds by providing flexibility in how transcribed text is delivered, allowing integration into various workflows while maintaining the core benefit of seamless speech-to-text conversion.
@@ -41,9 +31,8 @@ The solution succeeds by providing flexibility in how transcribed text is delive
 
 - Enable speech-to-clipboard transcription during coding workflows without context switching
 - Provide flexible output modes (clipboard, stdout, file) to support various development workflows
-- Deliver accurate transcription using services like OpenAI Whisper API and Azure Speech for technical content and coding scenarios
+- Deliver accurate transcription using Azure OpenAI GPT-4o for technical content and coding scenarios
 - Create a personal productivity CLI tool optimized for single-user MacOS development environment
-- Establish foundation for progressive enhancement of transcription capabilities
 
 ## Functional Requirements
 
@@ -86,7 +75,7 @@ The solution succeeds by providing flexibility in how transcribed text is delive
 
 ### 5. Transcription
 
-**FR5.1:** Transcription MUST support the OpenAI Whisper API
+**FR5.1:** Transcription MUST support Azure OpenAI GPT-4o
 **FR5.2:** Transcription MUST provide options for language selection and model customization
 **FR5.3:** Transcription MUST support manual start/stop
 **FR5.4:** Transcription MUST support output to file, stdout, or clipboard
@@ -96,10 +85,10 @@ The solution succeeds by providing flexibility in how transcribed text is delive
 
 ### 6. User Responsibilities
 
-**FR6.1:** Users MUST create and maintain their own OpenAI account for access to Whisper API services
-**FR6.2:** Users MUST obtain and configure their own OpenAI API keys via the OPENAI_API_KEY environment variable
-**FR6.3:** Users are RESPONSIBLE for all OpenAI API usage costs and billing management
-**FR6.4:** Users MUST ensure their OpenAI account has sufficient credit/billing setup before using transcription features
-**FR6.5:** Users MUST comply with OpenAI's terms of service and usage policies when using transcription features
+**FR6.1:** Users MUST create and maintain their own Azure OpenAI account for access to GPT-4o services
+**FR6.2:** Users MUST obtain and configure their own Azure OpenAI API keys via the API_KEY environment variable
+**FR6.3:** Users are RESPONSIBLE for all Azure OpenAI API usage costs and billing management
+**FR6.4:** Users MUST ensure their Azure OpenAI account has sufficient credit/billing setup before using transcription features
+**FR6.5:** Users MUST comply with Azure OpenAI's terms of service and usage policies when using transcription features
 **FR6.6:** Users MUST secure their API keys and are responsible for any unauthorized usage
-**FR6.7:** Users SHOULD monitor their OpenAI API usage to manage costs and avoid unexpected charges
+**FR6.7:** Users SHOULD monitor their Azure OpenAI API usage to manage costs and avoid unexpected charges

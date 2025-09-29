@@ -12,7 +12,7 @@ func main() {
 	app := &cli.App{
 		Name:  "sttrouter",
 		Usage: "speech-to-text transcription CLI for developers",
-		Description: "Capture audio from microphone and transcribe speech to text using Whisper API.\n" +
+		Description: "Capture audio from microphone and transcribe speech to text using GPT-4o.\n" +
 			"Supports output to clipboard, stdout, or files for integration into development workflows.",
 		Version: "dev",
 		Authors: []*cli.Author{

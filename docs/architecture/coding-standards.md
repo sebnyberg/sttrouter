@@ -6,7 +6,7 @@ This document defines the coding standards, patterns, and practices specific to 
 
 ### CLI Application Structure
 
-- Use Cobra CLI framework for command structure and flag handling
+- Use urfave/cli for command structure and flag handling
 - Implement commands as separate files in `cmd/` package
 - Follow the composable streaming pipeline architecture (see section 03)
 - Separate control flow (context) from data flow (io interfaces)

@@ -18,7 +18,7 @@ import (
 
 // TranscribeConfig holds transcribe specific configuration flags.
 type TranscribeConfig struct {
-	// Model specifies the Whisper model to use
+	// Model specifies the GPT-4o model to use
 	Model string `name:"model" value:"gpt-4o-transcribe" usage:"Model to use for transcription"`
 	// Language specifies the language code
 	Language string `name:"language" value:"en" usage:"Language code (e.g., 'en', 'es')"`
@@ -26,7 +26,7 @@ type TranscribeConfig struct {
 	ResponseFormat string `name:"response-format" value:"text" usage:"Response format (json,text,srt,verbose_json,vtt)"`
 	// Temperature specifies the sampling temperature (0.0 to 1.0)
 	Temperature float64 `name:"temperature" value:"0" usage:"Sampling temperature (0.0 to 1.0)"`
-	// OpenAI API Key
+	// Azure OpenAI API Key
 	APIKey string `name:"api-key"`
 	// API Base URL
 	BaseURL string `name:"base-url" value:"https://seblab-ai.openai.azure.com/openai/deployments/gpt-4o-transcribe"`
@@ -220,12 +220,12 @@ func NewTranscribeCommand() *cli.Command {
 
 	return &cli.Command{
 		Name:      "transcribe",
-		Usage:     "Capture audio from microphone and transcribe to text using OpenAI Whisper API",
+		Usage:     "Capture audio from microphone and transcribe to text using Azure OpenAI GPT-4o",
 		ArgsUsage: "",
-		Description: `Capture audio from the microphone and transcribe it to text using OpenAI's Whisper API.
+		Description: `Capture audio from the microphone and transcribe it to text using Azure OpenAI's GPT-4o.
 
 The --capture flag is required. Audio is captured from the microphone, converted to FLAC format,
-and sent to the Whisper API for transcription.
+and sent to GPT-4o for transcription.
 
 Output format can be controlled with --output-format:
 - text: Plain text output (default)

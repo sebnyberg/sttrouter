@@ -13,7 +13,7 @@ import (
 	"sync"
 )
 
-// Client represents an OpenAI API client
+// Client represents an Azure OpenAI API client
 type Client struct {
 	apiKey                string
 	baseURL               string
@@ -21,7 +21,7 @@ type Client struct {
 	httpClient            *http.Client
 }
 
-// NewClient creates a new OpenAI client
+// NewClient creates a new Azure OpenAI client
 func NewClient(apiKey, baseURL, additionalQueryParams string) *Client {
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
@@ -50,7 +50,7 @@ type TranscriptionResponse struct {
 	Text string `json:"text"`
 }
 
-// Transcribe transcribes an audio file using OpenAI's Whisper API
+// Transcribe transcribes an audio file using Azure OpenAI's GPT-4o
 func (c *Client) Transcribe(ctx context.Context, req TranscriptionRequest) (*TranscriptionResponse, error) {
 	// Open the audio file
 	file, err := os.Open(req.File)

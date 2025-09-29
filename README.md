@@ -1,256 +1,77 @@
 # sttrouter
 
-A Go CLI application for speech-to-text transcription, designed to enable voice-driven text input in development workflows.
+A macOS-only Go CLI tool for speech-to-text transcription using the Azure OpenAI hosted version of GPT-4o.
 
-## Overview
+## How it works
 
-sttrouter combines audio capture capabilities with transcription services to provide a speech-to-text solution. The tool supports multiple output modes (clipboard, stdout, file) and is designed for integration into development workflows.
-
-## Features
-
-- **Device Listing**: List available audio input devices with default indication
-- **Audio Capture**: Record from system microphone with configurable duration
-- **Transcription Service Integration**: Configurable transcription services for speech-to-text conversion
-- **Multiple Output Modes**:
-  - Clipboard mode for direct system clipboard integration
-  - Stdout mode for command-line workflows and piping
-  - File mode for direct file output
-- **Cross-platform Audio Support**: Uses Sox for audio capture
-- **VSCode Extension Ready**: Designed for integration with development environments
+Captures audio from microphone using Sox, converts to FLAC, sends to Azure OpenAI GPT-4o for transcription, outputs to clipboard, stdout, or file.
 
 ## Prerequisites
 
-- **Sox**: Required for audio capture and processing
-- **Transcription service credentials**: API keys for your chosen transcription service
+- macOS 12.0+
+- Sox (audio capture)
+- Azure OpenAI API key
 
 ## Installation
 
-### Pre-built Binaries
+### From source
 
-**Note: Releases not done yet**
-
-Download the latest release from [GitHub Releases](https://github.com/sebnyberg/sttrouter/releases).
-
-```bash
-# macOS example
-curl -L https://github.com/sebnyberg/sttrouter/releases/download/v1.0.0/sttrouter-darwin-arm64 -o sttrouter
-chmod +x sttrouter
-sudo mv sttrouter /usr/local/bin/
-```
-
-### From Source (Recommended)
-
-If you have Go 1.24+ installed:
+Requires Go 1.24+:
 
 ```bash
 go install github.com/sebnyberg/sttrouter@latest
 ```
 
-## Setup
+### Pre-built binaries
 
-1. Configure your transcription service API credentials as required by your chosen service.
-
-2. Verify the installation:
-   ```bash
-   sttrouter --help
-   ```
-
-## Development Setup
-
-For contributors who want to build and develop the project:
-
-### Prerequisites
-
-- **Go 1.24.x**: Primary development language
-- **Nix**: Reproducible development environment (optional but recommended)
-- **direnv**: Automatic environment loading (optional but recommended)
-- **FFmpeg**: Audio capture and processing (installed via Nix or system PATH)
-
-### Option 1: Using Nix (Recommended for Development)
-
-1. Install Nix package manager:
-   ```bash
-   curl -L https://nixos.org/nix/install | sh
-   ```
-
-2. Install direnv:
-   ```bash
-   # macOS with Homebrew
-   brew install direnv
-
-   # Or manually
-   curl -sfL https://direnv.net/install.sh | bash
-   ```
-
-3. Clone the repository and enter the directory:
-   ```bash
-   git clone https://github.com/sebnyberg/sttrouter.git
-   cd sttrouter
-   ```
-
-4. Allow direnv to load the development environment:
-   ```bash
-   direnv allow
-   ```
-
-The Nix environment will automatically provide Go, FFmpeg, and golangci-lint in your development environment.
-
-### Option 2: Manual Development Setup
-
-1. Install Go 1.24.x from [golang.org](https://golang.org/dl/)
-2. Install Sox:
-   ```bash
-   # macOS with Homebrew
-   brew install sox
-   ```
-3. Clone and build:
-   ```bash
-   git clone https://github.com/sebnyberg/sttrouter.git
-   cd sttrouter
-   go mod download
-   ```
+Not available yet.
 
 ## Usage
 
-### Basic Commands
+### Commands
+
+- `list-devices`: List available audio input devices
+- `capture`: Record audio to file
+- `transcribe`: Transcribe audio file or capture from microphone
+
+### Examples
 
 ```bash
-# List available audio devices
+# List devices
 sttrouter list-devices
 
-# Record audio to file
-sttrouter capture --duration 5s output.wav
+# Capture audio
+sttrouter capture --duration 5s output.flac
 
-# Transcribe an audio file
-sttrouter transcribe --api-key YOUR_AZURE_API_KEY --language en recording.flac
+# Transcribe file
+sttrouter transcribe --api-key YOUR_AZURE_KEY file.flac
 
 # Capture and transcribe from microphone
-sttrouter transcribe --capture --api-key YOUR_AZURE_API_KEY
+sttrouter transcribe --capture --api-key YOUR_AZURE_KEY
 
-# Capture and transcribe from microphone with JSON output
-sttrouter transcribe --capture --api-key YOUR_AZURE_API_KEY --output-format json
+# Capture and copy to clipboard
+sttrouter transcribe --capture --api-key YOUR_AZURE_KEY --clipboard
 
-# Capture and transcribe from microphone with no output (silent)
-sttrouter transcribe --capture --api-key YOUR_AZURE_API_KEY --output-format none
-
-# Capture and transcribe from microphone and copy to clipboard
-sttrouter transcribe --capture --api-key YOUR_AZURE_API_KEY --clipboard
-
-# Use custom query parameters
-sttrouter transcribe --api-key YOUR_AZURE_API_KEY --language en --query-params "api-version=2025-03-01-preview" recording.flac
+# Azure OpenAI example (default configuration)
+sttrouter transcribe --capture --api-key YOUR_AZURE_KEY --base-url https://your-resource.openai.azure.com/openai/deployments/{deployment_id} --query-params "api-version=2025-03-01-preview"
 ```
 
-### Example Script
-
-See `example.sh` for a basic script that transcribes the included sample audio file.
-
-Make sure to set your OpenAI API key before running:
+Set API key as environment variable:
 
 ```bash
-export OPENAI_API_KEY="your-api-key-here"
-./example.sh
+export API_KEY="your-azure-openai-key"
+sttrouter transcribe --capture
 ```
 
-### Build Instructions
+## Technology
 
-The project uses a Makefile for common development tasks. Run `make help` to see all available commands.
+- Go 1.24
+- Sox for audio capture
+- Azure OpenAI GPT-4o (hosted version, currently only supported)
+- urfave/cli for CLI framework
 
-### Basic Build
+## Restrictions
 
-```bash
-# Build the application
-make build
-
-# The binary will be created at bin/sttrouter
-```
-
-### Testing
-
-```bash
-# Run all tests with race detection
-make test
-```
-
-### Linting
-
-```bash
-# Run golangci-lint to check code quality
-make lint
-```
-
-The project uses golangci-lint with a configuration that focuses on practical code quality improvements while avoiding unhelpful complexity metrics. The linter checks for:
-
-- Static analysis issues (staticcheck)
-- Go vet warnings (govet)
-- Unused variables/constants/functions (unused)
-- Ineffectual assignments (ineffassign)
-- Unchecked errors (errcheck, excluded from test files)
-- Misspelled words (misspell)
-
-Complexity metrics like cyclomatic complexity and cognitive complexity are explicitly disabled as they often penalize valid code patterns.
-
-## Development Workflow
-
-### Environment Setup
-
-The project uses Nix for reproducible development environments. When you enter the project directory, direnv automatically loads the development shell with all required tools.
-
-The Nix environment provides:
-- **Go 1.24.x**: Primary development language
-- **golangci-lint**: Code linting and quality checks
-- **Sox**: Audio processing for runtime functionality
-- **Git & curl**: Development utilities
-
-### Available Make Commands
-
-```bash
-make help     # Show all available commands
-make build    # Build the sttrouter binary
-make test     # Run all tests with race detection
-make lint     # Run golangci-lint
-make clean    # Remove build artifacts
-```
-
-### Code Quality
-
-Before committing code:
-1. Run `make test` to ensure all tests pass
-2. Run `make lint` to check code quality
-3. Run `make build` to verify the code compiles
-
-The project follows Go best practices as outlined in [Effective Go](https://go.dev/doc/effective_go) and the implementation standards documented in `docs/architecture/06-implementation-standards.md`.
-
-## Contributing
-
-### Development Requirements
-
-- **Go 1.24.x**: Primary development language
-- **Nix**: Reproducible development environment (optional but recommended)
-- **direnv**: Automatic environment loading (optional but recommended)
-- **FFmpeg**: Audio capture and processing (installed via Nix or system PATH)
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Make your changes with tests
-4. Run the full test suite: `make test`
-5. Ensure code passes linting: `make lint`
-6. Submit a pull request
-
-### Development Standards
-
-- Follow [Effective Go](https://go.dev/doc/effective_go) guidelines
-- Use table-driven tests for multiple test cases
-- Document all exported symbols
-- Keep interfaces small and focused
-- Prefer sentinel errors over custom error types
-
-## License
-
-_TODO: Add license information_
-
-## Related Projects
-
-- [OpenAI Whisper API](https://platform.openai.com/docs/guides/speech-to-text) (one supported transcription service)
-- [Azure Speech Service](https://azure.microsoft.com/en-us/products/ai-services/ai-speech) (alternative transcription service)
-- [Cobra CLI Framework](https://github.com/spf13/cobra)
-- [Sox](https://sox.sourceforge.net/)
+- macOS only
+- Users responsible for API costs and compliance with Azure OpenAI terms
+- Requires API key configuration

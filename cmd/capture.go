@@ -177,7 +177,7 @@ func NewCaptureCommand() *cli.Command {
 		Description: `Capture audio from the specified microphone device using Sox.
 
 The OUTPUT_FILE is a required positional argument that specifies where to send the audio output.
-Use "-" to output to stdout (similar to how ffmpeg works).
+Use "-" to output to stdout.
 Output format is always FLAC.
 
 Examples:
@@ -185,10 +185,7 @@ Examples:
   sttrouter capture recording.flac
   
   # Output to stdout
-  sttrouter capture -
-  
-  # Pipe to another command
-  sttrouter capture - | ffplay -`,
+  sttrouter capture -`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
 			if c.NArg() != 1 {

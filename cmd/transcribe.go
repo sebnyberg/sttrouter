@@ -77,22 +77,22 @@ func runCaptureToWriter(baseConfig *Config, config *TranscribeConfig, resultsWri
 	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
 
-	sp, err := audio.NewSystemProfiler(ctx)
+	lister, err := audio.NewDeviceLister(ctx)
 	if err != nil {
-		panic(fmt.Errorf("failed to initialize system profiler: %w", err))
+		panic(fmt.Errorf("failed to initialize device lister: %w", err))
 	}
 
-	spDevices := sp.ListDevices()
+	devices := lister.ListDevices()
 
 	// Resolve device
 	var selectedDevice audio.Device
 	if config.Capture.Device == "" {
-		selectedDevice, err = audio.GetDefaultSource(spDevices)
+		selectedDevice, err = audio.GetDefaultSource(devices)
 		if err != nil {
 			panic(fmt.Errorf("failed to get default source device: %w", err))
 		}
 	} else {
-		selectedDevice, err = audio.GetDevice(config.Capture.Device, spDevices)
+		selectedDevice, err = audio.GetDevice(config.Capture.Device, devices)
 		if err != nil {
 			panic(fmt.Errorf("device '%s' not found", config.Capture.Device))
 		}

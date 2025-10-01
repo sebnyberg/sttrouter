@@ -66,22 +66,22 @@ func runCapture(baseConfig *Config, config *CaptureConfig, outputFile string, du
 	logger := baseConfig.getLogger()
 	slog.SetDefault(logger)
 
-	sp, err := audio.NewSystemProfiler(ctx)
+	lister, err := audio.NewDeviceLister(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize system profiler: %w", err)
+		return fmt.Errorf("failed to initialize device lister: %w", err)
 	}
 
-	spDevices := sp.ListDevices()
+	devices := lister.ListDevices()
 
 	// Resolve device
 	var selectedDevice audio.Device
 	if config.Device == "" {
-		selectedDevice, err = audio.GetDefaultSource(spDevices)
+		selectedDevice, err = audio.GetDefaultSource(devices)
 		if err != nil {
 			return fmt.Errorf("failed to get default source device: %w", err)
 		}
 	} else {
-		selectedDevice, err = audio.GetDevice(config.Device, spDevices)
+		selectedDevice, err = audio.GetDevice(config.Device, devices)
 		if err != nil {
 			return fmt.Errorf("device '%s' not found", config.Device)
 		}

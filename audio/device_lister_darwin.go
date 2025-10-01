@@ -7,8 +7,8 @@ import (
 	"os/exec"
 )
 
-// SystemProfiler handles device listing using macOS system_profiler
-type SystemProfiler struct {
+// DeviceLister handles device listing using macOS system_profiler
+type DeviceLister struct {
 	devices []Device
 }
 
@@ -56,8 +56,8 @@ func parseSystemProfilerDevices(output []byte) ([]Device, error) {
 	return devices, nil
 }
 
-// NewSystemProfiler creates a new SystemProfiler by running system_profiler
-func NewSystemProfiler(ctx context.Context) (*SystemProfiler, error) {
+// NewDeviceLister creates a new DeviceLister by running system_profiler
+func NewDeviceLister(ctx context.Context) (*DeviceLister, error) {
 	cmd := exec.CommandContext(ctx, "system_profiler", "SPAudioDataType", "-json")
 	output, err := cmd.Output()
 	if err != nil {
@@ -69,16 +69,16 @@ func NewSystemProfiler(ctx context.Context) (*SystemProfiler, error) {
 		return nil, err
 	}
 
-	return &SystemProfiler{devices: devices}, nil
+	return &DeviceLister{devices: devices}, nil
 }
 
 // ListDevices returns the list of devices
-func (s *SystemProfiler) ListDevices() []Device {
+func (s *DeviceLister) ListDevices() []Device {
 	return s.devices
 }
 
 // GetDefaultDeviceName returns the name of the current source device
-func (s *SystemProfiler) GetDefaultDeviceName() string {
+func (s *DeviceLister) GetDefaultDeviceName() string {
 	for _, device := range s.devices {
 		if device.Mode&DeviceFlagCurrentSource != 0 {
 			return device.Name

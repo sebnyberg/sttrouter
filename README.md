@@ -1,6 +1,6 @@
 # sttrouter
 
-A macOS-only Go CLI tool for speech-to-text transcription using the Azure OpenAI hosted version of GPT-4o.
+A Go CLI tool for speech-to-text transcription using the Azure OpenAI hosted version of GPT-4o.
 
 ## How it works
 
@@ -8,8 +8,14 @@ Captures audio from microphone using Sox, converts to FLAC, sends to Azure OpenA
 
 ## Prerequisites
 
-- macOS 12.0+
+- macOS 12.0+ or Linux
 - Sox (audio capture)
+  - macOS: `brew install sox`
+  - Linux: `apt install sox libsox-fmt-all` or `dnf install sox`
+- PulseAudio (Linux only - typically pre-installed)
+- Clipboard tool (Linux only):
+  - Wayland: `wl-clipboard` package
+  - X11: `xclip` package
 - Azure OpenAI API key
 
 ## Installation
@@ -67,8 +73,12 @@ sttrouter transcribe
 - Azure OpenAI GPT-4o (hosted version, currently only supported)
 - urfave/cli for CLI framework
 
+## Platform Support
+
+- **macOS**: Uses CoreAudio via Sox and pbcopy
+- **Linux**: Uses PulseAudio via Sox and wl-copy/xclip
+
 ## Restrictions
 
-- macOS only
 - Users responsible for API costs and compliance with Azure OpenAI terms
 - Requires API key configuration

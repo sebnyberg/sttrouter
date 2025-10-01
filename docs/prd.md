@@ -23,7 +23,7 @@ sttrouter provides a flexible speech-to-text transcription system through a Go C
 
 - **Output Flexibility:** Multiple modes support different use cases and workflows
 - **Cloud-Powered Accuracy:** Leverages Azure OpenAI's GPT-4o for superior transcription quality
-- **Personal Optimization:** Tailored for single-user MacOS environment
+- **Cross-Platform:** Supports both macOS and Linux environments
 
 The solution succeeds by providing flexibility in how transcribed text is delivered, allowing integration into various workflows while maintaining the core benefit of seamless speech-to-text conversion.
 
@@ -32,13 +32,13 @@ The solution succeeds by providing flexibility in how transcribed text is delive
 - Enable speech-to-clipboard transcription during coding workflows without context switching
 - Provide flexible output modes (clipboard, stdout, file) to support various development workflows
 - Deliver accurate transcription using Azure OpenAI GPT-4o for technical content and coding scenarios
-- Create a personal productivity CLI tool optimized for single-user MacOS development environment
+- Create a personal productivity CLI tool for macOS and Linux development environments
 
 ## Functional Requirements
 
 ### 1. System
 
-**FR1.1:** The system MUST support macOS 12.0+ (Monterey and later).
+**FR1.1:** The system MUST support macOS 12.0+ (Monterey and later) and modern Linux distributions with PulseAudio.
 **FR1.2:** The system MUST support verbose logging for debugging purposes.
 **FR1.3:** The system MUST support structured logging in JSON format
 **FR1.4:** The system MUST log to stderr to avoid interfering with stdout output
@@ -58,14 +58,14 @@ The solution succeeds by providing flexibility in how transcribed text is delive
 
 ### 3. Device listing & selection
 
-**FR3.1:** Device listing MUST use device names compatible with `sox` (via `system_profiler`)
+**FR3.1:** Device listing MUST use device names compatible with `sox` (via platform-specific device lister using system_profiler on macOS or pactl on Linux)
 **FR3.2:** Device selection SHOULD use system defaults when available
 **FR3.3:** Device listing MAY provide additional information such as device type, sample rate, and channel count
 **FR3.4:** Device listing MUST use identifiers that are agnostic across device providers
 
 ### 4. Audio capture
 
-**FR4.1:** Audio capture MUST use `sox`
+**FR4.1:** Audio capture MUST use `sox` with platform-specific drivers (CoreAudio on macOS, PulseAudio on Linux)
 **FR4.2:** Audio capture MUST use streaming audio formats (FLAC)
 **FR4.3:** Audio capture MUST support output to file or stdout
 **FR4.4:** Audio capture MUST support streaming to a transcription service
@@ -78,7 +78,7 @@ The solution succeeds by providing flexibility in how transcribed text is delive
 **FR5.1:** Transcription MUST support Azure OpenAI GPT-4o
 **FR5.2:** Transcription MUST provide options for language selection and model customization
 **FR5.3:** Transcription MUST support manual start/stop
-**FR5.4:** Transcription MUST support output to file, stdout, or clipboard
+**FR5.4:** Transcription MUST support output to file, stdout, or clipboard (pbcopy on macOS, wl-copy/xclip on Linux)
 **FR5.5:** Transcription MUST support streaming of audio capture to the transcription service
 **FR5.6:** Transcription MAY support streaming of transcription results prior to the full completion of audio capture
 **FR5.7:** Transcription MUST support asynchronous operation with signal-based stop

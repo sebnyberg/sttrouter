@@ -11,12 +11,14 @@ sttrouter/
 │   ├── device.go           # Device data structures and utilities
 │   ├── errors.go           # Sentinel error definitions
 │   ├── silence_splitter.go   # Silence detection for audio capture
-│   ├── sox.go              # Sox-based audio capture
-│   ├── system_profiler.go  # macOS system_profiler-based device listing
-│   ├── sox_test.go         # Tests for sox functionality
-│   └── system_profiler_test.go # Tests for system_profiler parsing
+│   ├── sox.go              # Shared sox types and structures
+│   ├── sox_darwin.go       # macOS-specific sox audio capture (CoreAudio)
+│   ├── sox_linux.go        # Linux-specific sox audio capture (PulseAudio)
+│   ├── device_lister_darwin.go  # macOS device listing using system_profiler
+│   └── device_lister_linux.go   # Linux device listing using pactl
 ├── clipboard/              # Clipboard operations
-│   └── clipboard.go        # Cross-platform clipboard copy functionality
+│   ├── clipboard_darwin.go # macOS clipboard (pbcopy)
+│   └── clipboard_linux.go  # Linux clipboard (wl-copy/xclip)
 ├── cmd/                    # CLI commands (urfave/cli)
 │   ├── capture.go          # capture command implementation
 │   ├── config.go           # Global configuration structures
@@ -79,14 +81,18 @@ sttrouter/
 - **`device.go`** - Device data structures and utilities
 - **`errors.go`** - Sentinel error definitions
 - **`silence_splitter.go`** - Silence detection for audio capture
-- **`sox.go`** - Sox-based audio capture implementation
-  - Uses sox command-line tool for audio capture from devices
-- **`system_profiler.go`** - macOS system_profiler-based device listing implementation
+- **`sox.go`** - Shared sox types and argument structures
+- **`sox_darwin.go`** - macOS sox audio capture using CoreAudio driver
+- **`sox_linux.go`** - Linux sox audio capture using PulseAudio driver
+- **`device_lister_darwin.go`** - macOS device listing via system_profiler
   - Parses system_profiler JSON output for audio devices and defaults
+- **`device_lister_linux.go`** - Linux device listing via pactl
+  - Parses pactl output for PulseAudio devices and defaults
 
 ### Clipboard Package (`clipboard/`)
 
-- **`clipboard.go`** - Cross-platform clipboard copy functionality
+- **`clipboard_darwin.go`** - macOS clipboard using pbcopy
+- **`clipboard_linux.go`** - Linux clipboard using wl-copy (Wayland) or xclip (X11)
 
 ### OpenAI Package (`openaix/`)
 
@@ -116,7 +122,7 @@ sttrouter/
 ### File Naming Conventions
 
 - Commands: `{action}.go` (e.g., `list_devices.go`)
-- Platform code: `{file}_{platform}.go` (future: `devices_darwin.go`)
+- Platform code: `{file}_{platform}.go` (e.g., `sox_darwin.go`, `sox_linux.go`)
 - Tests: `{file}_test.go`
 - Architecture docs: `{nn}-{topic}.md` (numbered for sequence)
 

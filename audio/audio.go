@@ -10,12 +10,12 @@ import (
 )
 
 func ListDevices() ([]Device, error) {
-	sp, err := NewSystemProfiler(context.Background())
+	lister, err := NewDeviceLister(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
-	return sp.ListDevices(), nil
+	return lister.ListDevices(), nil
 }
 
 func ListSinks() ([]Device, error) {

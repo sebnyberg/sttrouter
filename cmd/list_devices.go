@@ -126,7 +126,7 @@ func NewListDevicesCommand() *cli.Command {
 		Usage: "List available audio devices",
 		Description: `List available audio devices for recording and playback.
 
-This command enumerates audio devices using system_profiler,
+This command enumerates audio devices using platform-specific tools (system_profiler on macOS, pactl on Linux),
 processes the information, and outputs devices in lexicographical order with their capabilities.`,
 		Flags: flags,
 		Action: func(c *cli.Context) error {
